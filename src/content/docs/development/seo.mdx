@@ -1,0 +1,1034 @@
+---
+title: SEO
+description: Comprehensive SEO setup with metadata, dynamic OG images, sitemaps, structured data, and performance optimization.
+---
+
+By the end of this guide, you'll have implemented a complete SEO strategy for your SaaS application with dynamic metadata, Open Graph images, sitemaps, structured data, and performance optimizations.
+
+## Overview
+
+The SaaS Boilerplate provides a comprehensive SEO system built on Next.js with Fumadocs integration, supporting dynamic metadata, Open Graph images, sitemaps, and structured data. Key features include:
+
+- **Dynamic metadata**: Page-specific titles, descriptions, and Open Graph tags
+- **Open Graph images**: Dynamic social media previews with custom branding
+- **Sitemap generation**: Automatic XML sitemaps with proper priorities and change frequencies
+- **Robots.txt**: Search engine crawling instructions
+- **Structured data**: JSON-LD schema markup for rich search results
+- **Canonical URLs**: Proper URL canonicalization to prevent duplicate content
+- **Performance optimization**: Core Web Vitals and SEO-friendly loading
+- **PWA manifest**: Progressive Web App metadata for mobile installation
+- **Documentation SEO**: Fumadocs integration with optimized content structure
+
+The system automatically generates SEO metadata while providing full customization capabilities for specific pages and content types.
+
+## Architecture
+
+### Next.js Metadata API
+
+The foundation uses Next.js 15 Metadata API for comprehensive SEO control:
+
+```typescript
+// src/app/layout.tsx - Root metadata
+export const metadata: Metadata = {
+  metadataBase: new URL(AppConfig.url),
+  title: AppConfig.name,
+  openGraph: {
+    title: AppConfig.name,
+    url: AppConfig.url,
+    siteName: AppConfig.name,
+    images: [{
+      url: `${AppConfig.url}/og-image.png`,
+      width: 1200,
+      height: 630,
+      alt: AppConfig.name,
+    }],
+  },
+}
+```
+
+### Dynamic Open Graph Images
+
+Dynamic OG images are generated using Next.js edge runtime:
+
+```typescript
+// src/app/og/docs/[...slug]/route.tsx
+export async function GET(request: Request, { params }) {
+  const page = source.getPage(params.slug)
+  
+  return new ImageResponse(
+    (
+      <DefaultImage
+        title={page.data.title}
+        description={page.data.description}
+        site="My App"
+      />
+    ),
+    {
+      width: 1200,
+      height: 630,
+    },
+  )
+}
+```
+
+### Sitemap and Robots Integration
+
+Automatic sitemap generation with proper SEO structure:
+
+```typescript
+// src/app/sitemap.ts
+export default function sitemap(): MetadataRoute.Sitemap {
+  return [
+    {
+      url: `${base}/`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 1,
+    },
+    // ... more entries
+  ]
+}
+```
+
+## Setting Up SEO
+
+<Steps>
+<Step>
+### Configure Base Metadata
+
+Set up root metadata in your layout:
+
+```typescript
+// src/app/layout.tsx
+export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL),
+  title: {
+    default: 'Your SaaS App',
+    template: '%s | Your SaaS App'
+  },
+  description: 'Description of your SaaS application',
+  keywords: ['saas', 'productivity', 'collaboration'],
+  authors: [{ name: 'Your Company' }],
+  creator: 'Your Company',
+  publisher: 'Your Company',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: process.env.NEXT_PUBLIC_APP_URL,
+    siteName: 'Your SaaS App',
+    images: [{
+      url: '/og-image.png',
+      width: 1200,
+      height: 630,
+      alt: 'Your SaaS App',
+    }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Your SaaS App',
+    description: 'Description of your SaaS application',
+    images: ['/og-image.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+}
+```
+</Step>
+
+<Step>
+### Create OG Image Templates
+
+Set up dynamic Open Graph image generation:
+
+```typescript
+// src/app/og/route.tsx
+import { ImageResponse } from 'next/og'
+
+export async function GET() {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#0f0f0f',
+          fontSize: 32,
+          fontWeight: 600,
+        }}
+      >
+        <div style={{ color: '#ffffff' }}>Your SaaS App</div>
+      </div>
+    ),
+    {
+      width: 1200,
+      height: 630,
+    },
+  )
+}
+```
+</Step>
+
+<Step>
+### Configure Sitemap
+
+Create a comprehensive sitemap:
+
+```typescript
+// src/app/sitemap.ts
+import { MetadataRoute } from 'next'
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  
+  // Static pages
+  const staticPages = [
+    { url: '/', priority: 1, changeFrequency: 'weekly' },
+    { url: '/pricing', priority: 0.8, changeFrequency: 'monthly' },
+    { url: '/blog', priority: 0.7, changeFrequency: 'weekly' },
+    { url: '/docs', priority: 0.7, changeFrequency: 'weekly' },
+    { url: '/contact', priority: 0.5, changeFrequency: 'yearly' },
+  ]
+  
+  // Dynamic pages (fetch from database)
+  const dynamicPages = await getDynamicPages()
+  
+  return [
+    ...staticPages.map(page => ({
+      url: `${baseUrl}${page.url}`,
+      lastModified: new Date(),
+      changeFrequency: page.changeFrequency as any,
+      priority: page.priority,
+    })),
+    ...dynamicPages
+  ]
+}
+```
+</Step>
+
+<Step>
+### Set Up Robots.txt
+
+Configure search engine crawling rules:
+
+```typescript
+// src/app/robots.ts
+export default function robots(): MetadataRoute.Robots {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  
+  return {
+    rules: {
+      userAgent: '*',
+      allow: '/',
+      disallow: ['/api/', '/admin/', '/private/'],
+    },
+    sitemap: `${baseUrl}/sitemap.xml`,
+    host: baseUrl,
+  }
+}
+```
+</Step>
+
+<Step>
+### Add Structured Data
+
+Implement JSON-LD structured data:
+
+```typescript
+// src/app/layout.tsx or specific pages
+export const metadata: Metadata = {
+  other: {
+    'script:ld+json': JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: 'Your SaaS App',
+      url: process.env.NEXT_PUBLIC_APP_URL,
+      logo: `${process.env.NEXT_PUBLIC_APP_URL}/logo.png`,
+      sameAs: [
+        'https://twitter.com/yourcompany',
+        'https://linkedin.com/company/yourcompany'
+      ]
+    })
+  }
+}
+```
+</Step>
+</Steps>
+
+## Backend Usage (Procedures & Controllers)
+
+### Dynamic Metadata Generation
+
+Generate metadata based on database content:
+
+```typescript
+// Blog post page
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const post = await api.blogPosts.getById.query({ params: { id: params.id } })
+  
+  if (!post.data) {
+    return {
+      title: 'Post Not Found'
+    }
+  }
+  
+  return {
+    title: post.data.title,
+    description: post.data.excerpt,
+    openGraph: {
+      title: post.data.title,
+      description: post.data.excerpt,
+      images: [{
+        url: post.data.featuredImage,
+        width: 1200,
+        height: 630,
+        alt: post.data.title,
+      }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.data.title,
+      description: post.data.excerpt,
+      images: [post.data.featuredImage],
+    },
+  }
+}
+```
+
+### SEO-Optimized Controllers
+
+Create controllers that support SEO metadata:
+
+```typescript
+// Blog controller with SEO support
+export const blogController = igniter.controller({
+  name: 'Blog',
+  path: '/blog',
+  actions: {
+    getBySlug: igniter.query({
+      name: 'getBlogPost',
+      description: 'Get blog post by slug with SEO metadata',
+      method: 'GET',
+      path: '/:slug',
+      handler: async ({ context, request, response }) => {
+        const post = await context.database.blogPost.findUnique({
+          where: { slug: request.params.slug },
+          include: { author: true, tags: true }
+        })
+        
+        if (!post) {
+          return response.notFound({ message: 'Post not found' })
+        }
+        
+        // Add SEO metadata to response
+        return response.success(post, {
+          seo: {
+            title: post.title,
+            description: post.excerpt,
+            image: post.featuredImage,
+            publishedTime: post.publishedAt,
+            modifiedTime: post.updatedAt,
+            author: post.author.name,
+            tags: post.tags.map(tag => tag.name)
+          }
+        })
+      }
+    })
+  }
+})
+```
+
+## Frontend Usage (Client-side)
+
+### Dynamic Page Metadata
+
+Update metadata dynamically in client components:
+
+```typescript
+// Client component with dynamic metadata
+'use client'
+
+import { useEffect } from 'react'
+import Head from 'next/head'
+
+function ProductPage({ product }: { product: Product }) {
+  useEffect(() => {
+    // Update document title
+    document.title = `${product.name} | Your SaaS App`
+    
+    // Update meta description
+    const metaDescription = document.querySelector('meta[name="description"]')
+    if (metaDescription) {
+      metaDescription.setAttribute('content', product.description)
+    }
+    
+    // Update Open Graph tags
+    updateMetaTag('og:title', product.name)
+    updateMetaTag('og:description', product.description)
+    updateMetaTag('og:image', product.image)
+  }, [product])
+  
+  return <ProductDetails product={product} />
+}
+
+function updateMetaTag(property: string, content: string) {
+  let element = document.querySelector(`meta[property="${property}"]`)
+  if (!element) {
+    element = document.createElement('meta')
+    element.setAttribute('property', property)
+    document.head.appendChild(element)
+  }
+  element.setAttribute('content', content)
+}
+```
+
+### SEO-Friendly Routing
+
+Implement proper routing with SEO considerations:
+
+```typescript
+// SEO-friendly navigation
+function Navigation() {
+  const router = useRouter()
+  
+  const handleNavigation = (href: string, title: string) => {
+    // Update page title immediately for better UX
+    document.title = `${title} | Your SaaS App`
+    
+    router.push(href)
+  }
+  
+  return (
+    <nav>
+      <Link 
+        href="/products" 
+        onClick={(e) => {
+          e.preventDefault()
+          handleNavigation('/products', 'Products')
+        }}
+      >
+        Products
+      </Link>
+    </nav>
+  )
+}
+```
+
+## SEO Components and Features
+
+### Fumadocs SEO Integration
+
+Documentation pages with automatic SEO:
+
+```typescript
+// src/app/(site)/(content)/docs/[[...slug]]/page.tsx
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const page = source.getPage(params.slug)
+  
+  if (!page) {
+    return {
+      title: 'Page Not Found'
+    }
+  }
+  
+  return {
+    title: page.data.title,
+    description: page.data.description,
+    openGraph: {
+      title: page.data.title,
+      description: page.data.description,
+      type: 'article',
+      images: [{
+        url: `/og/docs/${params.slug?.join('/') || 'index'}`,
+        width: 1200,
+        height: 630,
+        alt: page.data.title,
+      }],
+    },
+  }
+}
+```
+
+### PWA Manifest
+
+Progressive Web App metadata:
+
+```typescript
+// src/app/manifest.ts
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'Your SaaS App',
+    short_name: 'SaaS App',
+    description: 'A comprehensive SaaS application',
+    start_url: '/app',
+    display: 'standalone',
+    background_color: '#0f0f0f',
+    theme_color: '#0f0f0f',
+    icons: [
+      {
+        src: '/icon-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        src: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+      },
+    ],
+  }
+}
+```
+
+### Structured Data Components
+
+Reusable structured data components:
+
+```typescript
+// components/seo/StructuredData.tsx
+interface StructuredDataProps {
+  type: 'Article' | 'Product' | 'Organization' | 'WebSite'
+  data: Record<string, any>
+}
+
+export function StructuredData({ type, data }: StructuredDataProps) {
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': type,
+    ...data
+  }
+  
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(structuredData)
+      }}
+    />
+  )
+}
+
+// Usage in pages
+function BlogPost({ post }: { post: BlogPost }) {
+  return (
+    <>
+      <StructuredData
+        type="Article"
+        data={{
+          headline: post.title,
+          description: post.excerpt,
+          image: post.featuredImage,
+          datePublished: post.publishedAt,
+          dateModified: post.updatedAt,
+          author: {
+            '@type': 'Person',
+            name: post.author.name
+          }
+        }}
+      />
+      <article>{/* Blog post content */}</article>
+    </>
+  )
+}
+```
+
+## Practical Examples
+
+### Backend: E-commerce Product SEO
+
+Complete product page SEO implementation:
+
+```typescript
+// Product page with comprehensive SEO
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const product = await api.products.getById.query({ 
+    params: { id: params.id } 
+  })
+  
+  if (!product.data) {
+    return {
+      title: 'Product Not Found'
+    }
+  }
+  
+  return {
+    title: `${product.data.name} | Your SaaS App`,
+    description: product.data.description.substring(0, 160),
+    keywords: product.data.tags,
+    openGraph: {
+      title: product.data.name,
+      description: product.data.description,
+      images: [{
+        url: product.data.images[0],
+        width: 1200,
+        height: 630,
+        alt: product.data.name,
+      }],
+      type: 'product',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: product.data.name,
+      description: product.data.description,
+      images: [product.data.images[0]],
+    },
+    other: {
+      'product:price:amount': product.data.price.toString(),
+      'product:price:currency': 'USD',
+      'product:availability': product.data.inStock ? 'in stock' : 'out of stock',
+    }
+  }
+}
+
+function ProductPage({ product }: { product: Product }) {
+  return (
+    <>
+      <StructuredData
+        type="Product"
+        data={{
+          name: product.name,
+          description: product.description,
+          image: product.images,
+          offers: {
+            '@type': 'Offer',
+            price: product.price,
+            priceCurrency: 'USD',
+            availability: product.inStock 
+              ? 'https://schema.org/InStock' 
+              : 'https://schema.org/OutOfStock'
+          }
+        }}
+      />
+      <div>{/* Product page content */}</div>
+    </>
+  )
+}
+```
+
+### Frontend: Dynamic SEO Updates
+
+Client-side SEO updates for SPAs:
+
+```typescript
+// Custom hook for SEO management
+function useSEO() {
+  const updateTitle = useCallback((title: string) => {
+    document.title = title
+  }, [])
+  
+  const updateMeta = useCallback((name: string, content: string) => {
+    let meta = document.querySelector(`meta[name="${name}"]`)
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.setAttribute('name', name)
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', content)
+  }, [])
+  
+  const updateOG = useCallback((property: string, content: string) => {
+    let meta = document.querySelector(`meta[property="${property}"]`)
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.setAttribute('property', property)
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', content)
+  }, [])
+  
+  const setPageSEO = useCallback((seo: {
+    title?: string
+    description?: string
+    image?: string
+    url?: string
+  }) => {
+    if (seo.title) {
+      updateTitle(seo.title)
+      updateOG('og:title', seo.title)
+    }
+    
+    if (seo.description) {
+      updateMeta('description', seo.description)
+      updateOG('og:description', seo.description)
+    }
+    
+    if (seo.image) {
+      updateOG('og:image', seo.image)
+    }
+    
+    if (seo.url) {
+      updateOG('og:url', seo.url)
+    }
+  }, [updateTitle, updateMeta, updateOG])
+  
+  return { setPageSEO, updateTitle, updateMeta, updateOG }
+}
+
+// Usage in components
+function ProductDetail({ product }: { product: Product }) {
+  const { setPageSEO } = useSEO()
+  
+  useEffect(() => {
+    setPageSEO({
+      title: `${product.name} | Your Store`,
+      description: product.description,
+      image: product.images[0],
+      url: `/products/${product.id}`
+    })
+  }, [product, setPageSEO])
+  
+  return <ProductComponent product={product} />
+}
+```
+
+### Backend: Blog SEO with Rich Snippets
+
+Blog implementation with rich search results:
+
+```typescript
+// Blog controller with SEO metadata
+export const blogController = igniter.controller({
+  name: 'Blog',
+  path: '/blog',
+  actions: {
+    getBySlug: igniter.query({
+      name: 'getBlogPost',
+      description: 'Get blog post with SEO metadata',
+      method: 'GET',
+      path: '/:slug',
+      handler: async ({ context, request, response }) => {
+        const post = await context.database.blogPost.findUnique({
+          where: { slug: request.params.slug },
+          include: { 
+            author: { select: { name: true, image: true } },
+            tags: { select: { name: true } },
+            category: { select: { name: true } }
+          }
+        })
+        
+        if (!post) {
+          return response.notFound({ message: 'Post not found' })
+        }
+        
+        // Generate SEO metadata
+        const seoMetadata = {
+          title: post.title,
+          description: post.excerpt || post.content.substring(0, 160),
+          image: post.featuredImage,
+          publishedTime: post.publishedAt,
+          modifiedTime: post.updatedAt,
+          author: post.author.name,
+          tags: post.tags.map(tag => tag.name),
+          category: post.category?.name,
+          wordCount: post.content.split(' ').length,
+          readingTime: Math.ceil(post.content.split(' ').length / 200)
+        }
+        
+        return response.success({
+          post,
+          seo: seoMetadata
+        })
+      }
+    })
+  }
+})
+
+// Blog post page
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const result = await api.blog.getBySlug.query({ 
+    params: { slug: params.slug } 
+  })
+  
+  if (!result.data) {
+    return { title: 'Post Not Found' }
+  }
+  
+  const { post, seo } = result.data
+  
+  return {
+    title: seo.title,
+    description: seo.description,
+    keywords: seo.tags,
+    authors: [{ name: seo.author }],
+    openGraph: {
+      title: seo.title,
+      description: seo.description,
+      images: [{
+        url: seo.image,
+        width: 1200,
+        height: 630,
+        alt: seo.title,
+      }],
+      type: 'article',
+      publishedTime: seo.publishedTime,
+      modifiedTime: seo.modifiedTime,
+      authors: [seo.author],
+      tags: seo.tags,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seo.title,
+      description: seo.description,
+      images: [seo.image],
+    },
+    other: {
+      'article:author': seo.author,
+      'article:published_time': seo.publishedTime,
+      'article:modified_time': seo.modifiedTime,
+      'article:tag': seo.tags,
+    }
+  }
+}
+```
+
+## SEO Data Structure
+
+### Metadata API Types
+
+<TypeTable
+  type={{
+    title: {
+      description: 'Page title configuration',
+      type: 'string | TitleConfig',
+      default: 'App name or custom title',
+    },
+    description: {
+      description: 'Page description for search results',
+      type: 'string',
+      default: '160 characters max',
+    },
+    keywords: {
+      description: 'SEO keywords array',
+      type: 'string[]',
+      default: 'Relevant keywords',
+    },
+    openGraph: {
+      description: 'Open Graph metadata for social sharing',
+      type: 'OpenGraph',
+      default: 'Facebook, LinkedIn, etc.',
+    },
+    twitter: {
+      description: 'Twitter Card metadata',
+      type: 'TwitterCard',
+      default: 'Twitter-specific sharing',
+    },
+    robots: {
+      description: 'Search engine crawling instructions',
+      type: 'RobotsConfig',
+      default: 'index: true, follow: true',
+    },
+  }}
+/>
+
+### Sitemap Entry Structure
+
+<TypeTable
+  type={{
+    url: {
+      description: 'Full URL of the page',
+      type: 'string',
+      default: 'Required',
+    },
+    lastModified: {
+      description: 'Last modification date',
+      type: 'Date | string',
+      default: 'Current date',
+    },
+    changeFrequency: {
+      description: 'How often content changes',
+      type: 'ChangeFrequency',
+      default: 'weekly',
+    },
+    priority: {
+      description: 'Page priority (0.0 to 1.0)',
+      type: 'number',
+      default: '0.5',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Open Graph images not showing in social media">
+Use Facebook's sharing debugger or LinkedIn's post inspector to check. Ensure images are publicly accessible and meet size requirements (1200x630px). Clear social media caches.
+</Accordion>
+
+<Accordion title="Pages not appearing in search results">
+Wait for search engine crawling (can take days/weeks). Ensure pages are indexed (check robots.txt). Use Google Search Console to submit sitemaps and monitor indexing status.
+</Accordion>
+
+<Accordion title="Dynamic metadata not working">
+Ensure `generateMetadata` is exported from page components. Check that the function is async and returns proper Metadata object. Verify Next.js version supports dynamic metadata.
+</Accordion>
+
+<Accordion title="Sitemap not generating correctly">
+Check sitemap.ts exports a proper function. Ensure all URLs are absolute and properly formatted. Use online sitemap validators to check syntax.
+</Accordion>
+
+<Accordion title="Structured data errors">
+Use Google's Rich Results Test to validate JSON-LD. Ensure @context is "https://schema.org". Check for required properties in schema definitions.
+</Accordion>
+
+<Accordion title="Canonical URL issues">
+Ensure canonical URLs point to the correct domain. Use absolute URLs in canonical tags. Avoid duplicate content by properly implementing canonicalization.
+</Accordion>
+
+<Accordion title="Core Web Vitals failing">
+Optimize images and loading performance. Use Next.js Image component. Implement proper caching strategies. Minimize render-blocking resources.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Implement comprehensive metadata">
+Always include title, description, and Open Graph tags. Use descriptive, keyword-rich titles under 60 characters. Write compelling descriptions under 160 characters.
+</Accordion>
+
+<Accordion title="Create compelling Open Graph images">
+Design custom OG images for important pages. Use consistent branding with readable text. Ensure 1200x630px dimensions. Test on different social platforms.
+</Accordion>
+
+<Accordion title="Structure content for SEO">
+Use proper heading hierarchy (H1, H2, H3). Include alt text for images. Use semantic HTML. Ensure mobile-friendly design. Optimize page load speed.
+</Accordion>
+
+<Accordion title="Implement structured data">
+Add JSON-LD schema markup for articles, products, organizations. Use appropriate schema types. Validate with Google's tools. Monitor rich results in Search Console.
+</Accordion>
+
+<Accordion title="Manage technical SEO">
+Submit sitemaps to search engines. Use robots.txt to control crawling. Implement proper redirects. Monitor for crawl errors. Fix broken links.
+</Accordion>
+
+<Accordion title="Optimize for Core Web Vitals">
+Improve Largest Contentful Paint (LCP), First Input Delay (FID), and Cumulative Layout Shift (CLS). Use Next.js optimizations. Optimize images and fonts.
+</Accordion>
+
+<Accordion title="Monitor and analyze performance">
+Use Google Search Console and Analytics. Track rankings and organic traffic. Monitor Core Web Vitals. Set up alerts for SEO issues.
+</Accordion>
+
+<Accordion title="Plan content and keyword strategy">
+Research target keywords. Create high-quality, valuable content. Optimize for user intent. Build internal linking structure. Earn backlinks naturally.
+</Accordion>
+
+<Accordion title="Ensure mobile optimization">
+Use responsive design. Test on mobile devices. Optimize tap targets. Ensure fast mobile loading. Use mobile-friendly meta viewport.
+</Accordion>
+
+<Accordion title="Handle internationalization">
+Use hreflang tags for multi-language sites. Set proper locale in metadata. Localize URLs and content. Consider geo-targeting.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Content Layer](../content-layer) - Fumadocs integration for documentation SEO
+- [Data Fetching](../data-fetching) - ISR and SSG for SEO optimization
+- [Authentication & Sessions](../authentication-and-sessions) - SEO considerations for protected content
+- [Performance and Security](../../architecture/performance-and-security) - SEO impact of performance
+- [Environment Variables](../../getting-started/environment-setup) - SEO configuration
+
+## API Reference
+
+### Next.js Metadata API
+
+<TypeTable
+  type={{
+    'generateMetadata(props)': {
+      description: 'Generate dynamic metadata for pages',
+      type: 'Promise<Metadata>',
+      default: 'Server-side function',
+    },
+    'export const metadata': {
+      description: 'Static metadata export',
+      type: 'Metadata',
+      default: 'Layout/page level',
+    },
+    'export const viewport': {
+      description: 'Viewport and theme configuration',
+      type: 'Viewport',
+      default: 'Layout level',
+    },
+  }}
+/>
+
+### SEO-Related Functions
+
+<TypeTable
+  type={{
+    'generateSitemap()': {
+      description: 'Generate XML sitemap',
+      type: 'Promise<Sitemap>',
+      default: 'src/app/sitemap.ts',
+    },
+    'export default function robots()': {
+      description: 'Generate robots.txt',
+      type: 'Robots',
+      default: 'src/app/robots.ts',
+    },
+    'export default function manifest()': {
+      description: 'Generate PWA manifest',
+      type: 'Manifest',
+      default: 'src/app/manifest.ts',
+    },
+  }}
+/>
+
+### Open Graph Image Generation
+
+<TypeTable
+  type={{
+    'new ImageResponse(element, options)': {
+      description: 'Generate dynamic OG images',
+      type: 'Response',
+      default: 'Edge runtime',
+    },
+    'GET /og/[...params]/route.tsx': {
+      description: 'Dynamic OG image routes',
+      type: 'ImageResponse',
+      default: 'src/app/og/',
+    },
+  }}
+/>
+
+### Structured Data Types
+
+<TypeTable
+  type={{
+    'Article': {
+      description: 'Blog posts, news articles',
+      type: 'Schema.org',
+      default: 'Rich search results',
+    },
+    'Product': {
+      description: 'E-commerce products',
+      type: 'Schema.org',
+      default: 'Product listings',
+    },
+    'Organization': {
+      description: 'Company information',
+      type: 'Schema.org',
+      default: 'Knowledge panels',
+    },
+    'WebSite': {
+      description: 'Site-wide information',
+      type: 'Schema.org',
+      default: 'Site links',
+    },
+  }}
+/>

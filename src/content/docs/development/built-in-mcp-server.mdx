@@ -1,0 +1,732 @@
+---
+title: Built-in MCP Server
+description: Native MCP Server per organization to connect ChatGPT, Claude, and developer tools to your SaaS via Igniter.js controllers.
+---
+
+By the end of this guide, you'll understand what the Model Context Protocol (MCP) is, how the SaaS Boilerplate's built-in MCP Server works, and how to extend it with custom tools, prompts, and resources. You'll learn how Igniter.js controllers are automatically converted into MCP tools and how to configure various AI clients to connect to your SaaS.
+
+## Before You Begin
+
+**Basic Knowledge**: Familiarity with REST APIs, TypeScript, and basic understanding of AI assistants
+**Environment Setup**: A running SaaS Boilerplate instance with Redis configured
+**Prerequisites**: Understanding of the [Authentication & Sessions](./authentication-and-sessions) and [Organizations & Tenancy](./organizations-and-tenancy) concepts
+**Optional**: Experience with AI tools like Cursor, Claude, or ChatGPT
+
+## What is the Model Context Protocol (MCP)?
+
+The Model Context Protocol (MCP) is an open-source standard that enables AI applications to connect to external systems in a standardized way. Think of MCP like a USB-C port for AI applications - just as USB-C provides a universal way to connect electronic devices, MCP provides a standardized way to connect AI models to data sources, tools, and workflows.
+
+### Why MCP Matters
+
+MCP solves a fundamental problem: AI applications were previously limited to their built-in capabilities and couldn't easily access external data or perform actions on behalf of users. With MCP:
+
+- **AI assistants can access your data**: ChatGPT can read your database, Claude can analyze your files
+- **AI can take actions**: Cursor can create GitHub issues, Claude can send emails through your system
+- **Standardized integration**: One protocol works across all MCP-compatible tools
+- **Security-first**: Each connection is authenticated and scoped to specific organizations
+
+### MCP Architecture
+
+MCP follows a client-server architecture where:
+- **MCP Servers** expose tools, resources, and prompts
+- **MCP Clients** (AI assistants) connect to servers and use their capabilities
+- **Transports** handle the communication between clients and servers
+
+The SaaS Boilerplate acts as an MCP Server, exposing your business logic as tools that AI assistants can use.
+
+## Core Concepts
+
+The SaaS Boilerplate includes a built-in MCP Server that transforms your Igniter.js application into an AI-native platform. This server exposes your API endpoints as MCP tools, scoped to each organization.
+
+### Automatic Tool Generation
+
+The most powerful feature is automatic conversion of Igniter.js controllers into MCP tools. Every `igniter.query()` and `igniter.mutation()` in your controllers becomes an executable tool for AI assistants.
+
+### Multi-Tenant Security
+
+Each organization gets its own MCP endpoint with organization-scoped authentication. API keys ensure that AI assistants can only access data for the specific organization they belong to.
+
+### Transport Flexibility
+
+The server supports both Server-Sent Events (SSE) and HTTP Streamable transports, enabling real-time bidirectional communication with AI clients.
+
+## The @igniter-js/adapter-mcp-server Package
+
+The `@igniter-js/adapter-mcp-server` package is the bridge between Igniter.js and the MCP protocol. It provides:
+
+- **Automatic introspection** of your router to discover controllers and actions
+- **Schema conversion** from Zod to JSON Schema for tool parameters
+- **Type-safe execution** using Igniter's `$caller` for direct server-side invocation
+- **Event-driven architecture** with hooks for monitoring and customization
+- **Multi-transport support** for different client requirements
+
+### Key Capabilities
+
+<TypeTable
+  type={{
+    "Automatic Tool Mapping": {
+      description: "Converts Igniter.js actions into MCP tools with parameter validation",
+      type: "Router Introspection"
+    },
+    "Custom Tools": {
+      description: "Add tools beyond your controllers with custom handlers",
+      type: "Extension API"
+    },
+    "Prompts": {
+      description: "Provide structured prompts for AI interactions",
+      type: "Server Feature"
+    },
+    "Resources": {
+      description: "Expose files, data, and content to AI clients",
+      type: "Server Feature"
+    },
+    "Event System": {
+      description: "Monitor tool calls, errors, and client interactions",
+      type: "Observability"
+    },
+    "Type Inference": {
+      description: "Full TypeScript inference from router to MCP context",
+      type: "Developer Experience"
+    }
+  }}
+/>
+
+## Architecture
+
+The MCP Server integrates deeply with the SaaS Boilerplate's existing architecture:
+
+- **Route Handler**: `src/app/(mcp)/mcp/[orgId]/[transport]/route.ts`
+- **Server Factory**: `src/igniter.mcp.ts`
+- **Settings UI**: `src/app/(private)/app/(organization)/(dashboard)/settings/organization/mcp/page.tsx`
+- **Key Management**: API key procedures and controllers
+- **CORS & Headers**: Next.js configuration for cross-origin requests
+
+### Request Flow
+
+<Steps>
+<Step>
+
+### Client Connection
+
+An AI client (like Cursor or Claude) connects to your MCP endpoint using an organization-specific API key:
+
+```typescript
+// Example: https://yourapp.com/mcp/sk_xxx.../sse
+{
+  "mcpServers": {
+    "your-saas": {
+      "type": "http",
+      "url": "https://yourapp.com/mcp/sk_xxx.../sse"
+    }
+  }
+}
+```
+
+</Step>
+
+<Step>
+
+### Authentication & Context
+
+The route handler extracts the organization ID from the API key and creates an authenticated context:
+
+```typescript
+// src/app/(mcp)/mcp/[orgId]/[transport]/route.ts
+const authMcpHandler = async (request: NextRequest, { params }: RouteContext) => {
+  const { orgId } = await params
+  request.headers.set('Authorization', `Bearer ${orgId}`)
+  return McpServer(orgId).handler(request)
+}
+```
+
+</Step>
+
+<Step>
+
+### Tool Execution
+
+When an AI requests a tool, the adapter:
+1. Validates the request against your Zod schemas
+2. Executes the corresponding Igniter.js action
+3. Returns the result in MCP format
+
+```typescript
+// Tool call: leads.list({})
+// Becomes: router.caller.leads.list.query({})
+```
+
+</Step>
+</Steps>
+
+## Transports
+
+The MCP Server supports two transport mechanisms for different client needs:
+
+### Server-Sent Events (SSE)
+
+SSE is the primary transport for most AI clients, providing real-time bidirectional communication.
+
+<Accordions type="multiple">
+<Accordion title="How SSE Works">
+SSE creates a persistent HTTP connection where the server can push messages to the client. This enables:
+- Real-time notifications from server to client
+- Streaming responses for long-running operations
+- Automatic reconnection on connection loss
+- Session management with resumable streams
+</Accordion>
+
+<Accordion title="SSE Message Flow">
+1. Client sends HTTP GET request with `Accept: text/event-stream`
+2. Server responds with `Content-Type: text/event-stream`
+3. Server can send multiple messages over the same connection
+4. Client can send POST requests for tool calls on separate connections
+5. Connection remains open for server-initiated messages
+</Accordion>
+
+<Accordion title="SSE Security">
+- Origin validation prevents DNS rebinding attacks
+- Session IDs for state management
+- Automatic cleanup on disconnection
+- Rate limiting and authentication checks
+</Accordion>
+</Accordions>
+
+### HTTP Streamable
+
+HTTP Streamable transport uses standard HTTP POST requests for all communication, suitable for environments with restricted connectivity.
+
+<Accordions type="multiple">
+<Accordion title="How HTTP Streamable Works">
+Each message is sent as a separate HTTP POST request. The server can respond with either:
+- `Content-Type: application/json` for immediate responses
+- `Content-Type: text/event-stream` to initiate streaming
+- `202 Accepted` for fire-and-forget notifications
+</Accordion>
+
+<Accordion title="HTTP Streamable Message Flow">
+1. Client POSTs JSON-RPC message to MCP endpoint
+2. Server processes request and responds appropriately
+3. For streaming responses, server initiates SSE stream
+4. Client can maintain multiple concurrent connections
+5. No persistent connections required
+</Accordion>
+
+<Accordion title="HTTP Streamable Benefits">
+- Works through firewalls and proxies
+- No persistent connection overhead
+- Easier debugging and monitoring
+- Compatible with serverless environments
+- Automatic request batching support
+</Accordion>
+</Accordions>
+
+## How Controllers Become MCP Tools
+
+The adapter automatically converts Igniter.js controllers into MCP tools through a sophisticated introspection process.
+
+### Tool Generation Process
+
+<Steps>
+<Step>
+
+### Router Traversal
+
+The adapter walks through your `AppRouter.controllers` map, discovering all controllers and their actions:
+
+```typescript
+// From your router
+const AppRouter = igniter.router({
+  controllers: {
+    lead: LeadController,
+    user: UserController,
+    // ...
+  }
+})
+```
+
+</Step>
+
+<Step>
+
+### Action Discovery
+
+For each controller, it extracts all `igniter.query()` and `igniter.mutation()` actions:
+
+```typescript
+// LeadController
+export const LeadController = igniter.controller({
+  name: 'Lead',
+  path: '/leads',
+  actions: {
+    list: igniter.query({ /* ... */ }),
+    create: igniter.mutation({ /* ... */ }),
+    // ...
+  }
+})
+```
+
+</Step>
+
+<Step>
+
+### Schema Conversion
+
+Zod schemas are converted to JSON Schema format that MCP clients understand:
+
+```typescript
+// Igniter action with Zod
+list: igniter.query({
+  body: z.object({
+    limit: z.number().optional(),
+    offset: z.number().optional()
+  })
+})
+
+// Becomes MCP tool schema
+{
+  "type": "object",
+  "properties": {
+    "limit": { "type": "number" },
+    "offset": { "type": "number" }
+  }
+}
+```
+
+</Step>
+
+<Step>
+
+### Tool Registration
+
+Each action becomes a named tool (e.g., `leads.list`, `leads.create`) that AI clients can invoke.
+
+</Step>
+</Steps>
+
+### Tool Naming Convention
+
+Tools are named using the pattern `{controller}.{action}` in lowercase:
+
+- `lead.list` → `leads_list`
+- `user.create` → `users_create`
+- `billing.getSubscription` → `billing_getSubscription`
+
+### Parameter Mapping
+
+Igniter.js parameters are mapped to MCP tool arguments:
+
+<TypeTable
+  type={{
+    "body": {
+      description: "Request body parameters become tool arguments",
+      type: "Direct Mapping"
+    },
+    "query": {
+      description: "Query parameters are included in tool arguments",
+      type: "Merged with body"
+    },
+    "path": {
+      description: "URL path parameters become required arguments",
+      type: "Required Parameters"
+    }
+  }}
+/>
+
+## Custom Tools with .addTool()
+
+Custom tools in MCP allow you to extend your server's capabilities beyond the automatically generated tools from your Igniter.js controllers. These are specialized functions that AI clients can invoke to perform specific tasks that aren't covered by your standard API endpoints.
+
+Custom tools are particularly useful when you need to implement complex business logic, integrate with external services, or provide AI-specific functionality that doesn't fit the traditional REST API pattern. For example, you might create a custom tool for generating analytics reports, processing files with AI models, or orchestrating multi-step workflows that involve multiple API calls.
+
+When to use custom tools:
+- **Complex computations**: Machine learning predictions, data analysis, or algorithmic processing
+- **External integrations**: Connecting to third-party APIs or services
+- **Composite operations**: Workflows that combine multiple API calls into a single AI-invokable action
+- **AI-specific features**: Specialized prompts, content generation, or intelligent automation
+
+For detailed information about MCP tools and their capabilities, refer to the [official MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/server/tools).
+
+### Adding Custom Tools
+
+```typescript
+// src/igniter.mcp.ts
+export const McpServer = (organizationId: string) => {
+  return IgniterMCPServer.create()
+    .router(igniter.router({ controllers: { /* ... */ } }))
+    .addTool({
+      name: 'analyze_user_behavior',
+      description: 'Analyze user behavior patterns using advanced ML models',
+      schema: {
+        userId: z.string(),
+        timeframe: z.enum(['week', 'month', 'year'])
+      },
+      handler: async (args, context) => {
+        // Custom logic here
+        const analysis = await analyzeUserBehavior(args.userId, args.timeframe)
+        return { result: analysis }
+      }
+    })
+    .build()
+}
+```
+
+### Custom Tool Capabilities
+
+<Accordions type="multiple">
+<Accordion title="Complex Logic">
+Custom tools can implement business logic that doesn't fit controller patterns, such as:
+- Machine learning predictions
+- Data aggregation and analytics
+- External API integrations
+- Complex multi-step workflows
+</Accordion>
+
+<Accordion title="Type Safety">
+Tools maintain full TypeScript inference with automatic schema generation from Zod.
+</Accordion>
+
+<Accordion title="Context Access">
+Custom tools receive the same MCP context as controller tools, including user and organization information.
+</Accordion>
+</Accordions>
+
+## Prompts with .addPrompt()
+
+MCP prompts are structured message templates that guide AI interactions by providing context, instructions, and examples for specific tasks. Unlike tools that perform actions, prompts shape how AI models respond and behave in conversations.
+
+Prompts are essential for creating consistent AI experiences across different clients and use cases. They allow you to define reusable conversation patterns, provide domain-specific guidance, or create specialized workflows that help AI assistants work more effectively with your application.
+
+When to use prompts:
+- **Task-specific guidance**: Direct AI behavior for customer support, content creation, or technical analysis
+- **Context provision**: Supply background information, examples, or reference materials
+- **Workflow automation**: Create standardized processes for common user interactions
+- **Personalization**: Customize AI responses based on user roles, organization context, or specific requirements
+
+For comprehensive details about MCP prompts, including message formats and best practices, see the [official MCP prompts specification](https://modelcontextprotocol.io/specification/2025-03-26/server/prompts).
+
+### Adding Prompts
+
+```typescript
+// src/igniter.mcp.ts
+export const McpServer = (organizationId: string) => {
+  return IgniterMCPServer.create()
+    .router(igniter.router({ controllers: { /* ... */ } }))
+    .addPrompt({
+      name: 'customer_support',
+      description: 'Guide for handling customer support inquiries',
+      schema: {
+        userId: z.string(),
+        timeframe: z.enum(['week', 'month', 'year'])
+      },
+      handler: async (args, context) => {
+        return {
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Please help with this ${args.issue_type} issue. Use the available tools to investigate and resolve.`
+              }
+            }
+          ]
+        }
+      }
+    })
+    .build()
+}
+```
+
+### Prompt Features
+
+<Accordions type="multiple">
+<Accordion title="Parameterized Templates">
+Prompts can accept arguments to customize their content dynamically.
+</Accordion>
+
+<Accordion title="Multi-Modal Content">
+Support for text, images, audio, and embedded resources in prompt messages.
+</Accordion>
+
+<Accordion title="Context-Aware">
+Prompts can access MCP context to personalize content based on user or organization.
+</Accordion>
+</Accordions>
+
+## Resources with .addResource()
+
+MCP resources allow you to expose data, documents, and content that AI models can reference and incorporate into their responses. Resources provide a way for AI assistants to access contextual information like documentation, policies, user guides, or dynamically generated content.
+
+Resources are particularly valuable for providing AI assistants with access to information that enhances their ability to help users effectively. Instead of hardcoding knowledge into prompts, resources allow you to keep information current and provide AI with access to the latest documentation, policies, or application-specific data.
+
+When to use resources:
+- **Documentation access**: API docs, user guides, or help content
+- **Policy and compliance**: Company policies, terms of service, or regulatory information
+- **Dynamic data**: Real-time metrics, user-specific information, or generated reports
+- **Reference materials**: Code examples, configuration templates, or knowledge base articles
+
+For complete information about MCP resources, including URI schemes and content types, refer to the [official MCP resources specification](https://modelcontextprotocol.io/specification/2025-03-26/server/resources).
+
+### Adding Resources
+
+```typescript
+// src/igniter.mcp.ts
+export const McpServer = (organizationId: string) => {
+  return IgniterMCPServer.create()
+    .router(igniter.router({ controllers: { /* ... */ } }))
+    .addResource({
+      uri: `org://${organizationId}/company-policy`,
+      name: 'Company Policy',
+      description: 'Current company policies and guidelines',
+      mimeType: 'text/markdown',
+      handler: async () => {
+        const policy = await getCompanyPolicy(organizationId)
+        return { text: policy }
+      }
+    })
+    .addResource({
+      uri: `org://${organizationId}/user-guide`,
+      name: 'User Guide',
+      description: 'Application user guide and documentation',
+      mimeType: 'text/html',
+      handler: async () => {
+        const guide = await generateUserGuide(organizationId)
+        return { text: guide }
+      }
+    })
+    .build()
+}
+```
+
+### Resource Types
+
+<Accordions type="multiple">
+<Accordion title="Text Resources">
+Plain text or formatted content like documentation, policies, or guides.
+</Accordion>
+
+<Accordion title="Binary Resources">
+Images, PDFs, or other binary data encoded as base64.
+</Accordion>
+
+<Accordion title="Dynamic Resources">
+Content generated on-demand based on current application state.
+</Accordion>
+
+<Accordion title="Template Resources">
+Parameterized resources using URI templates (e.g., `user://{userId}/profile`).
+</Accordion>
+</Accordions>
+
+## Implementation Details
+
+Now let's see how to implement and configure the MCP Server in your SaaS Boilerplate.
+
+<Steps>
+<Step>
+
+### Configure the MCP Server Factory
+
+Create the server factory in `src/igniter.mcp.ts`:
+
+```typescript
+// src/igniter.mcp.ts
+import { IgniterMCPServer } from '@igniter-js/adapter-mcp-server'
+import { igniter } from '@/igniter.router'
+import { lead, SubmissionController } from '@/features'
+
+export const McpServer = (organizationId: string) => {
+  return IgniterMCPServer.create()
+    .withServerInfo({
+      name: 'SaaS Boilerplate',
+      version: '1.0.0'
+    })
+    .router(igniter.router({
+      controllers: {
+        lead: LeadController,
+        submission: SubmissionController
+      }
+    }))
+    .withAdapter({
+      redisUrl: process.env.REDIS_URL!,
+      basePath: `/mcp/${organizationId}`
+    })
+    .build()
+}
+```
+
+</Step>
+
+<Step>
+
+### Set Up the Route Handler
+
+Create the Next.js route handler for MCP requests:
+
+```typescript
+// src/app/(mcp)/mcp/[orgId]/[transport]/route.ts
+import { McpServer } from '@/igniter.mcp'
+import type { NextRequest } from 'next/server';
+
+// Handles authentication for MCP (Model Context Protocol)
+const authMcpHandler = async (request: NextRequest, { params }: RouteContext<'/mcp/[orgId]/[transport]'>) => {
+    const { orgId } = await params;
+
+    // Set the organization ID in the request headers
+    request.headers.set('Authorization', `Bearer ${orgId}`);
+
+    // Call the MCP server handler with the modified request
+    return McpServer(orgId).handler(request);
+}
+
+// Export the handler for Next.js to handle both GET and POST requests
+export const GET = authMcpHandler
+export const POST = authMcpHandler
+export const DELETE = authMcpHandler
+```
+
+</Step>
+
+<Step>
+
+### Configure Authentication
+
+Ensure your `AuthFeatureProcedure` supports API key authentication:
+
+```typescript
+// In your auth procedure
+getSession: async (options?: GetSessionInput<TRequirements, TRoles>) => {
+  // ... existing session logic ...
+
+  // Check for API key authentication
+  if (!session) {
+    const authHeader = request.headers.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+      // Validate API key and create virtual session
+    }
+  }
+}
+```
+
+</Step>
+</Steps>
+
+## Configuration
+
+### Environment Variables
+
+<TypeTable
+  type={{
+    "REDIS_URL": {
+      description: "Redis connection URL for transport state management",
+      type: "Required"
+    },
+    "IGNITER_MCP_SERVER_BASE_PATH": {
+      description: "Base path for MCP endpoints (default: /api/mcp)",
+      type: "Optional"
+    },
+    "IGNITER_MCP_SERVER_TIMEOUT": {
+      description: "Maximum execution time for tool calls (default: 60s)",
+      type: "Optional"
+    }
+  }}
+/>
+
+### Client Configuration Examples
+
+#### Cursor
+
+```json
+// .cursor/mcp.json
+{
+  "mcpServers": {
+    "your-saas": {
+      "type": "http",
+      "url": "https://yourapp.com/mcp/sk_xxx.../sse"
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+```json
+// ~/Library/Application Support/Claude/claude_desktop_config.json
+{
+  "mcpServers": {
+    "your-saas": {
+      "type": "http",
+      "url": "https://yourapp.com/mcp/sk_xxx.../sse"
+    }
+  }
+}
+```
+
+#### VS Code Copilot
+
+```json
+// .vscode/mcp.json
+{
+  "servers": {
+    "your-saas": {
+      "command": "npx",
+      "args": ["@vercel/mcp-adapter", "http://localhost:3000/mcp/sk_xxx.../sse"]
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="MCP client can't connect">
+Check that `REDIS_URL` is properly configured. Verify the API key is valid and has the correct format (`sk_...`). Ensure CORS headers are configured in `next.config.ts`.
+</Accordion>
+
+<Accordion title="Tools not appearing in client">
+Verify that controllers are properly exported and included in the router. Check that actions have proper Zod schemas. Ensure the MCP client supports the transport type (SSE vs HTTP Streamable).
+</Accordion>
+
+<Accordion title="Authentication errors">
+Confirm API key exists in database and is enabled. Check that the endpoint requires appropriate organization roles. Verify the `AuthFeatureProcedure` supports Bearer token authentication.
+</Accordion>
+
+<Accordion title="Tool execution fails">
+Check server logs for detailed error messages. Verify that the action's business logic handles the parameters correctly. Ensure database connections and external services are available.
+</Accordion>
+
+<Accordion title="Performance issues">
+Monitor Redis connection pool. Consider implementing caching for frequently accessed resources. Use the event system to identify slow operations.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Security First">
+Always validate inputs and implement proper access controls. Use organization-scoped API keys. Regularly rotate keys and monitor usage.
+</Accordion>
+
+<Accordion title="Performance Optimization">
+Cache frequently accessed resources. Use streaming for large responses. Implement rate limiting to prevent abuse.
+</Accordion>
+
+<Accordion title="User Experience">
+Provide clear tool descriptions and parameter documentation. Use meaningful names that AI assistants can understand. Include examples in your schemas.
+</Accordion>
+
+<Accordion title="Monitoring & Observability">
+Use the event system to track tool usage and performance. Log errors and unusual patterns. Set up alerts for failed operations.
+</Accordion>
+
+<Accordion title="Versioning & Compatibility">
+Plan for API changes that might break MCP tools. Use semantic versioning for your MCP server. Provide migration guides for breaking changes.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [API Keys](./api-keys.mdx) - Managing MCP authentication keys
+- [Controllers & Procedures](./controllers-and-procedures.mdx) - Building the APIs that become MCP tools
+- [Organizations & Tenancy](./organizations-and-tenancy.mdx) - Understanding multi-tenant architecture
+- [Authentication & Sessions](./authentication-and-sessions.mdx) - How MCP integrates with your auth system

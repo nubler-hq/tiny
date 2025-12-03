@@ -1,0 +1,689 @@
+---
+title: Email
+description: Transactional email system with React Email templates, multiple adapters, and real-time preview.
+---
+
+By the end of this guide, you'll have set up a comprehensive transactional email system with React Email templates, multiple provider adapters, and real-time preview capabilities for reliable email delivery in your SaaS application.
+
+## Overview
+
+The SaaS Boilerplate includes a robust email system built on React Email that supports multiple delivery providers, template-based rendering, and real-time preview development. Key features include:
+
+- **Multi-provider support**: SMTP, Resend, and other email providers via adapters
+- **React Email templates**: Beautiful, responsive email templates with Tailwind CSS
+- **Type-safe templates**: Zod schemas ensure data validation and type safety
+- **Real-time preview**: Live email preview during development with `npm run dev:email`
+- **Notification integration**: Seamless integration with the notification system for multi-channel delivery
+- **Template registry**: Centralized template management with automatic rendering
+- **Error handling**: Comprehensive error tracking and retry mechanisms
+- **Development tools**: Hot-reload preview and template development workflow
+
+The system integrates deeply with the notification service, allowing you to send emails as part of broader notification workflows while maintaining separation of concerns.
+
+## Architecture
+
+### Mail Provider System
+
+The email system is built around the `MailProvider` class, which orchestrates template rendering, adapter selection, and delivery:
+
+```typescript
+// src/@saas-boilerplate/providers/mail/mail.provider.tsx
+const mailProvider = MailProvider.initialize({
+  secret: AppConfig.providers.mail.secret,
+  from: AppConfig.providers.mail.from,
+  adapter: getAdapter(AppConfig.providers.mail.provider),
+  templates: {
+    welcome: welcomeEmailTemplate,
+    'organization-invite': organizationInviteTemplate,
+    // ... more templates
+  }
+})
+```
+
+### Email Adapters
+
+The system supports multiple email providers through adapter pattern:
+
+**SMTP Adapter** (for development/local):
+```typescript
+// src/@saas-boilerplate/providers/mail/adapters/smtp.adapter.ts
+export const smtpAdapter = MailProvider.adapter((options) => ({
+  send: async ({ to, subject, html, text }) => {
+    const transport = nodemailer.createTransporter(options.secret)
+    await transport.sendMail({ from: options.from, to, subject, html, text })
+  }
+}))
+```
+
+**Resend Adapter** (for production):
+```typescript
+// src/@saas-boilerplate/providers/mail/adapters/resend.adapter.ts
+export const resendAdapter = MailProvider.adapter((options) => ({
+  send: async ({ to, subject, html, text, scheduledAt }) => {
+    const resend = new Resend(options.secret)
+    await resend.emails.create({
+      from: options.from,
+      to,
+      subject,
+      html,
+      text,
+      scheduled_at: scheduledAt?.toISOString()
+    })
+  }
+}))
+```
+
+### Template System
+
+Templates are defined with Zod schemas and React components:
+
+```typescript
+// Template definition with schema and component
+export const welcomeEmailTemplate = MailProvider.template({
+  subject: `Welcome to ${AppConfig.name}`,
+  schema: z.object({
+    name: z.string().nullable().optional(),
+    email: z.string().email()
+  }),
+  render: WelcomeEmailComponent
+})
+```
+
+### Notification Integration
+
+The notification service integrates email delivery as a channel:
+
+```typescript
+// src/services/notification.ts
+channels: {
+  'email': {
+    send: async ({ data, template, context }) => {
+      // Find recipients and send emails using mail service
+      const recipients = await findRecipients(context)
+      await Promise.all(recipients.map(recipient => 
+        mail.send({
+          template: 'notification',
+          to: recipient.email,
+          data: { /* notification data */ }
+        })
+      ))
+    }
+  }
+}
+```
+
+## Setting Up Email
+
+<Steps>
+<Step>
+### Configure Email Provider
+
+Set up your email provider in the configuration. For development, use SMTP with MailHog:
+
+```typescript
+// src/config/boilerplate.config.server.ts
+export const AppConfig = {
+  providers: {
+    mail: {
+      provider: 'smtp',
+      secret: 'smtp://localhost:1025',
+      from: 'noreply@yourapp.com'
+    }
+  }
+}
+```
+
+For production, use Resend or another provider:
+
+```typescript
+export const AppConfig = {
+  providers: {
+    mail: {
+      provider: 'resend',
+      secret: process.env.RESEND_API_KEY,
+      from: 'noreply@yourapp.com'
+    }
+  }
+}
+```
+</Step>
+
+<Step>
+### Start MailHog for Development
+
+For local development, run MailHog to capture emails:
+
+```bash
+# Using Docker (recommended)
+docker run -d -p 1025:1025 -p 8025:8025 mailhog/mailhog
+
+# Or using the provided script
+npm run docker:up
+```
+
+Access the MailHog web interface at `http://localhost:8025` to view sent emails.
+</Step>
+
+<Step>
+### Create Email Templates
+
+Create new email templates in `src/content/mails/`:
+
+```typescript
+// src/content/mails/custom-email.template.ts
+import { z } from 'zod'
+import { MailProvider } from '@/@saas-boilerplate/providers/mail'
+import { CustomEmailComponent } from './custom-email.component'
+
+export const customEmailTemplate = MailProvider.template({
+  subject: 'Custom Email Subject',
+  schema: z.object({
+    userName: z.string(),
+    actionUrl: z.string().url()
+  }),
+  render: CustomEmailComponent
+})
+```
+
+Add the template to the mail service registry:
+
+```typescript
+// src/services/mail.ts
+export const mail = MailProvider.initialize({
+  // ... other config
+  templates: {
+    // ... existing templates
+    custom: customEmailTemplate
+  }
+})
+```
+</Step>
+
+<Step>
+### Preview Templates in Development
+
+Start the email preview server to see templates in real-time:
+
+```bash
+npm run dev:email
+```
+
+This starts a development server at `http://localhost:3001` where you can preview and test email templates with different data.
+</Step>
+</Steps>
+
+## Backend Usage (Procedures & Controllers)
+
+### Sending Emails Directly
+
+Use the mail service directly in your procedures and controllers:
+
+```typescript
+// In a controller or procedure
+import { mail } from '@/services/mail'
+
+export const sendWelcomeEmail = igniter.mutation({
+  use: [AuthFeatureProcedure()],
+  handler: async ({ context, request }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated'
+    })
+
+    // Send welcome email
+    await mail.send({
+      template: 'welcome',
+      to: session.user.email,
+      data: {
+        name: session.user.name,
+        email: session.user.email
+      }
+    })
+
+    return response.success({ sent: true })
+  }
+})
+```
+
+### Integration with Notifications (Recommended)
+
+For better control and flexibility, integrate emails through the notification system:
+
+```typescript
+// In procedures/controllers - use notification service instead
+import { notification } from '@/services/notification'
+
+export const userRegistered = igniter.procedure({
+  handler: async ({ context }) => {
+    // Send welcome notification (includes email + in-app)
+    await notification.send({
+      type: 'USER_REGISTERED',
+      context: {
+        recipientId: userId
+      },
+      data: {
+        userName: user.name,
+        welcomeUrl: '/app/dashboard'
+      }
+    })
+  }
+})
+```
+
+### Template Data Validation
+
+Templates validate data using Zod schemas:
+
+```typescript
+// This will throw if data doesn't match schema
+await mail.send({
+  template: 'welcome',
+  to: 'user@example.com',
+  data: {
+    name: 'John Doe', // ✅ Valid
+    email: 'john@example.com', // ✅ Valid
+    invalidField: 'not allowed' // ❌ Would cause validation error
+  }
+})
+```
+
+## Frontend Usage (Client-side)
+
+### Email Preview Development
+
+The email preview system allows you to develop templates interactively:
+
+```bash
+# Start preview server
+npm run dev:email
+
+# Visit http://localhost:3001 to see:
+# - List of all email templates
+# - Live preview with sample data
+# - Hot-reload when templates change
+# - Test different data scenarios
+```
+
+### Template Development Workflow
+
+Develop email templates with React components:
+
+```tsx
+// src/content/mails/custom-email.component.tsx
+import * as ReactEmail from '@react-email/components'
+
+export interface CustomEmailProps {
+  userName: string
+  actionUrl: string
+}
+
+export function CustomEmailComponent({ userName, actionUrl }: CustomEmailProps) {
+  return (
+    <ReactEmail.Html>
+      <ReactEmail.Body>
+        <ReactEmail.Text>Hello {userName}!</ReactEmail.Text>
+        <ReactEmail.Link href={actionUrl}>Click here</ReactEmail.Link>
+      </ReactEmail.Body>
+    </ReactEmail.Html>
+  )
+}
+```
+
+## Email Templates
+
+### Available Templates
+
+<TypeTable
+  type={{
+    welcome: {
+      description: 'Welcome email for new users',
+      data: 'name, email',
+      channels: 'email',
+    },
+    'organization-invite': {
+      description: 'Organization invitation email',
+      data: 'organizationName, inviterName, role, inviteUrl',
+      channels: 'email',
+    },
+    'billing-plan-upgrade': {
+      description: 'Plan upgrade confirmation',
+      data: 'planName, amount, currency',
+      channels: 'email',
+    },
+    'billing-plan-downgrade': {
+      description: 'Plan downgrade notification',
+      data: 'planName, featuresLost',
+      channels: 'email',
+    },
+    'billing-plan-quota-exceed': {
+      description: 'Usage quota exceeded warning',
+      data: 'feature, currentUsage, limit',
+      channels: 'email',
+    },
+    'otp-code': {
+      description: 'One-time password for authentication',
+      data: 'code, expiresIn',
+      channels: 'email',
+    },
+    notification: {
+      description: 'Generic notification template',
+      data: 'title, content, action',
+      channels: 'email',
+    },
+    feedback: {
+      description: 'Feedback submission confirmation',
+      data: 'feedbackId, submittedAt',
+      channels: 'email',
+    },
+    'trial-started': {
+      description: 'Trial period started',
+      data: 'planName, trialDays',
+      channels: 'email',
+    },
+    'trial-ended': {
+      description: 'Trial period ended',
+      data: 'planName, upgradeUrl',
+      channels: 'email',
+    },
+  }}
+/>
+
+### Creating Custom Templates
+
+Create new templates following the established pattern:
+
+```typescript
+// 1. Define the React component
+export function CustomTemplate({ data }: CustomTemplateProps) {
+  return (
+    <ReactEmail.Html>
+      {/* Your email HTML */}
+    </ReactEmail.Html>
+  )
+}
+
+// 2. Define the template with schema
+export const customTemplate = MailProvider.template({
+  subject: 'Custom Subject',
+  schema: z.object({
+    requiredField: z.string(),
+    optionalField: z.string().optional()
+  }),
+  render: CustomTemplate
+})
+
+// 3. Register in mail service
+templates: {
+  custom: customTemplate
+}
+```
+
+## Practical Examples
+
+### Backend: User Registration Flow
+
+Send welcome email when user registers:
+
+```typescript
+// In user registration procedure
+export const registerUser = igniter.procedure({
+  handler: async ({ context, request }) => {
+    const user = await createUser(request.body)
+    
+    // Send welcome email via notification system
+    await notification.send({
+      type: 'USER_REGISTERED',
+      context: { recipientId: user.id },
+      data: {
+        userName: user.name,
+        email: user.email,
+        dashboardUrl: '/app/dashboard'
+      }
+    })
+    
+    return response.created(user)
+  }
+})
+```
+
+### Backend: Organization Invitation
+
+Send invitation emails to new members:
+
+```typescript
+// In organization invite procedure
+export const inviteMember = igniter.procedure({
+  handler: async ({ context, request }) => {
+    const invitation = await createInvitation(request.body)
+    
+    // Send invitation via direct mail (for one-off emails)
+    await mail.send({
+      template: 'organization-invite',
+      to: invitation.email,
+      data: {
+        organizationName: invitation.organization.name,
+        inviterName: session.user.name,
+        role: invitation.role,
+        inviteUrl: `/invite/${invitation.token}`
+      }
+    })
+    
+    return response.success(invitation)
+  }
+})
+```
+
+### Backend: Billing Notifications
+
+Send billing-related emails through notifications:
+
+```typescript
+// In billing webhook handler
+export const handlePaymentSuccess = igniter.procedure({
+  handler: async ({ context, request }) => {
+    const payment = await processPayment(request.body)
+    
+    await notification.send({
+      type: 'BILLING_SUCCESS',
+      context: { recipientId: payment.userId },
+      data: {
+        amount: payment.amount,
+        currency: payment.currency,
+        planName: payment.planName
+      }
+    })
+  }
+})
+```
+
+## Email Data Structure
+
+### MailProviderSendParams
+
+<TypeTable
+  type={{
+    to: {
+      description: 'Recipient email address',
+      type: 'string',
+      default: 'Required',
+    },
+    template: {
+      description: 'Template key from registry',
+      type: 'keyof Templates',
+      default: 'Required',
+    },
+    subject: {
+      description: 'Custom subject (optional, uses template default)',
+      type: 'string',
+      default: 'Template default',
+    },
+    data: {
+      description: 'Template data matching schema',
+      type: 'TemplateData',
+      default: 'Required',
+    },
+  }}
+/>
+
+### Template Schema
+
+<TypeTable
+  type={{
+    subject: {
+      description: 'Email subject line',
+      type: 'string',
+      default: 'Required',
+    },
+    schema: {
+      description: 'Zod schema for data validation',
+      type: 'ZodSchema',
+      default: 'Required',
+    },
+    render: {
+      description: 'React component for rendering',
+      type: 'React.Component',
+      default: 'Required',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Emails not being sent in development">
+Check if MailHog is running (`docker ps` or visit `http://localhost:8025`). Ensure SMTP configuration points to `smtp://localhost:1025`. Verify the email appears in MailHog's web interface.
+</Accordion>
+
+<Accordion title="Template validation errors">
+Ensure the data passed to `mail.send()` matches the template's Zod schema exactly. Check for required fields and correct data types. Use the preview server to test with different data.
+</Accordion>
+
+<Accordion title="Emails going to spam">
+Use a reputable email provider like Resend or SendGrid in production. Ensure proper SPF/DKIM/DMARC records are set up. Avoid spam trigger words in subject/content.
+</Accordion>
+
+<Accordion title="Preview server not starting">
+Ensure port 3001 is available. Check that all template components are properly exported and don't have syntax errors. Try clearing node_modules and reinstalling.
+</Accordion>
+
+<Accordion title="Production emails not working">
+Verify the production email provider API key is correctly set in environment variables. Check provider-specific configuration (Resend API key format, SMTP credentials, etc.).
+</Accordion>
+
+<Accordion title="Template not found error">
+Ensure the template is registered in the mail service's templates object. Check for typos in template names. Verify the template file is properly imported.
+</Accordion>
+
+<Accordion title="Email rendering issues">
+Test templates in the preview server first. Ensure all React Email components are imported correctly. Check for Tailwind CSS class conflicts. Use the plain text rendering for debugging.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Use notification system for multi-channel delivery">
+Integrate emails through the notification service rather than calling mail.send() directly. This provides consistency, user preferences, and easier testing.
+</Accordion>
+
+<Accordion title="Validate template data strictly">
+Use Zod schemas to validate all template data. This prevents runtime errors and ensures type safety across your email templates.
+</Accordion>
+
+<Accordion title="Test emails in development">
+Always use MailHog for development and test emails thoroughly. Check both HTML and plain text versions. Test with various data scenarios.
+</Accordion>
+
+<Accordion title="Handle email failures gracefully">
+Wrap email sending in try-catch blocks. Don't let email failures break your main business logic. Log errors for monitoring.
+</Accordion>
+
+<Accordion title="Use descriptive template names">
+Name templates clearly (e.g., 'organization-invite' instead of 'invite'). This makes the codebase more maintainable and the preview interface more useful.
+</Accordion>
+
+<Accordion title="Keep templates simple and focused">
+Each template should have a single, clear purpose. Avoid complex conditional logic in templates. Use data to customize content instead.
+</Accordion>
+
+<Accordion title="Monitor email delivery">
+Track email delivery rates, open rates, and bounce rates. Use your email provider's analytics to monitor campaign performance.
+</Accordion>
+
+<Accordion title="Respect user preferences">
+When using notifications, respect user email preferences. Allow users to opt-out of certain types of emails.
+</Accordion>
+
+<Accordion title="Use proper sender addresses">
+Configure proper from addresses that match your domain. Use sub-addressing (noreply@yourdomain.com) for transactional emails.
+</Accordion>
+
+<Accordion title="Schedule emails when appropriate">
+Use the schedule() method for time-sensitive emails. Consider user timezones when scheduling promotional emails.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Notifications](../notifications) - Multi-channel notification system that integrates with email
+- [Authentication & Sessions](../authentication-and-sessions) - User sessions and email verification flows
+- [Organizations and Tenancy](../organizations-and-tenancy) - Organization-scoped email delivery
+- [Jobs & Queues](../jobs-and-queues) - Background processing for bulk email operations
+- [Content Layer](../content-layer) - MDX content system used for email templates
+
+## API Reference
+
+### Mail Service Methods
+
+<TypeTable
+  type={{
+    'mail.send(params)': {
+      description: 'Send an email using a registered template',
+      type: 'Promise<void>',
+      default: 'Requires template and data',
+    },
+    'mail.schedule(params, date)': {
+      description: 'Schedule an email to be sent at a future date',
+      type: 'Promise<void>',
+      default: 'Date must be in future',
+    },
+  }}
+/>
+
+### Email Provider Configuration
+
+<TypeTable
+  type={{
+    provider: {
+      description: 'Email provider adapter (smtp, resend, etc.)',
+      type: 'string',
+      default: 'Required',
+    },
+    secret: {
+      description: 'Provider API key or SMTP URL',
+      type: 'string',
+      default: 'Required',
+    },
+    from: {
+      description: 'Default sender email address',
+      type: 'string',
+      default: 'Required',
+    },
+  }}
+/>
+
+### Development Commands
+
+<TypeTable
+  type={{
+    'npm run dev:email': {
+      description: 'Start email preview server with hot-reload',
+      type: 'Development',
+      default: 'Port 3001',
+    },
+    'npm run docker:up': {
+      description: 'Start MailHog for local email testing',
+      type: 'Development',
+      default: 'Ports 1025/8025',
+    },
+  }}
+/>

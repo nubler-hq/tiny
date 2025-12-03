@@ -1,0 +1,14 @@
+{
+  "title": "Getting Started",
+  "description": "Install, configure, run locally, and make your first deploy.",
+  "defaultOpen": true,
+  "icon": "Rocket",
+  "pages": [
+    "quickstart",
+    "installation",
+    "environment-setup",
+    "running-locally",
+    "first-deploy"
+  ]
+}
+

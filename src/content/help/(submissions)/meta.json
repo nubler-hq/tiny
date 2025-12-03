@@ -1,0 +1,9 @@
+{
+  "title": "Submissions",
+  "description": "Guide for managing submissions and forms.",
+  "icon": "SendIcon",
+  "pages": [
+    "managing-submissions"
+  ],
+  "defaultOpen": true
+}

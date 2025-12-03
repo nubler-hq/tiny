@@ -1,0 +1,511 @@
+---
+title: API Keys
+description: Secure programmatic access with organization-scoped API keys, authentication, and management.
+---
+
+By the end of this guide, you'll have set up API keys for secure programmatic access to your organization's resources, with proper authentication, scoping, and management capabilities.
+
+## Overview
+
+The SaaS Boilerplate includes a comprehensive API key system that enables secure programmatic access to organization resources without requiring user authentication. Key features include:
+
+- **Organization scoping**: API keys are tied to specific organizations with proper data isolation
+- **Secure generation**: Cryptographically secure keys with 'sk_' prefix for easy identification
+- **Flexible expiration**: Keys can never expire or have custom expiration dates
+- **Enable/disable control**: Instantly revoke access by disabling keys
+- **Bearer token authentication**: Standard HTTP Authorization header authentication
+- **Role-based access**: API keys inherit organization permissions and require role validation
+- **Audit trail**: Creation notifications and proper logging for security monitoring
+- **One-time display**: Keys are shown only once during creation for security
+
+The system integrates deeply with the authentication layer, automatically creating virtual sessions for API key requests while maintaining organization context and billing information.
+
+## Architecture
+
+### API Key Service
+
+The API key system consists of several integrated components:
+
+```typescript
+// src/@saas-boilerplate/features/api-key/procedures/api-key.procedure.ts
+const ApiKeyFeatureProcedure = igniter.procedure({
+  handler: async (_, { context }) => ({
+    apikey: {
+      create: async (input) => {
+        // Generate secure key: sk_ + 32 random bytes
+        const apiKey = `sk_${crypto.randomBytes(32).toString('hex')}`
+        return context.services.database.apiKey.create({ data: { ...input, key: apiKey } })
+      },
+      findManyByOrganization: async (orgId) => { /* ... */ },
+      update: async (params) => { /* ... */ },
+      delete: async (params) => { /* ... */ }
+    }
+  })
+})
+```
+
+### Authentication Integration
+
+API keys are validated through the authentication procedure, which checks for Bearer tokens when no regular session exists:
+
+```typescript
+// src/@saas-boilerplate/features/auth/procedures/auth.procedure.ts
+getSession: async (options) => {
+  // Check for API key in Authorization header
+  const authHeader = request.headers.get('Authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.substring(7)
+    const apiKey = await context.services.database.apiKey.findUnique({
+      where: { key: token, enabled: true },
+      include: { organization: true }
+    })
+    
+    if (apiKey) {
+      // Create virtual session with organization context
+      return { user: null, organization: apiKey.organization }
+    }
+  }
+}
+```
+
+### Database Schema
+
+API keys are stored with organization relationships and security metadata:
+
+<TypeTable
+  type={{
+    id: {
+      description: 'Unique identifier for the API key',
+      type: 'string',
+      default: 'Auto-generated UUID',
+    },
+    description: {
+      description: 'Human-readable description for identification',
+      type: 'string',
+      default: 'Required',
+    },
+    key: {
+      description: 'The actual API key value (hashed in storage)',
+      type: 'string',
+      default: 'Auto-generated with sk_ prefix',
+    },
+    enabled: {
+      description: 'Whether the key is currently active',
+      type: 'boolean',
+      default: 'true',
+    },
+    neverExpires: {
+      description: 'Whether the key has no expiration date',
+      type: 'boolean',
+      default: 'true',
+    },
+    expiresAt: {
+      description: 'Expiration timestamp if neverExpires is false',
+      type: 'Date | null',
+      default: 'null',
+    },
+    organizationId: {
+      description: 'ID of the owning organization',
+      type: 'string',
+      default: 'Required',
+    },
+  }}
+/>
+
+## Setting Up API Keys
+
+<Steps>
+<Step>
+### Access API Keys Management
+
+Navigate to your organization's settings and locate the API Keys section. Only organization owners and admins can access this area.
+</Step>
+
+<Step>
+### Create Your First API Key
+
+Click "Create API Key" and provide a descriptive name. Choose whether the key should never expire or set a custom expiration date.
+</Step>
+
+<Step>
+### Copy and Store the Key
+
+The API key will be displayed only once for security. Copy it immediately and store it securely - it cannot be retrieved later.
+</Step>
+
+<Step>
+### Configure Expiration (Optional)
+
+Set an expiration date if you want the key to automatically become invalid, or leave it as "never expires" for permanent access.
+</Step>
+</Steps>
+
+## Backend Usage (Procedures & Controllers)
+
+### Creating API Keys Programmatically
+
+Use the API key procedure to create keys in your business logic. Note that `ApiKeyFeatureProcedure` must be included in the controller's `use` array to access `context.apikey`:
+
+```typescript
+// In a controller or procedure
+export const createApiKeyEndpoint = igniter.mutation({
+  use: [ApiKeyFeatureProcedure(), AuthFeatureProcedure()],
+  handler: async ({ context }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated',
+      roles: ['owner', 'admin']
+    })
+
+    const newApiKey = await context.apikey.create({
+      description: 'Webhook Integration Key',
+      neverExpires: false,
+      expiresAt: new Date('2024-12-31'),
+      organizationId: session.organization.id
+    })
+
+    // Send notification about new key
+    await context.services.notification.send({
+      type: 'API_KEY_CREATED',
+      context: { organizationId: session.organization.id },
+      data: {
+        description: newApiKey.description,
+        keyPreview: newApiKey.key.slice(-4)
+      }
+    })
+
+    return response.created(newApiKey)
+  }
+})
+```
+
+### API Key Authentication in Controllers
+
+Protect endpoints that should accept API key authentication:
+
+```typescript
+// Controller that accepts both user and API key auth
+export const protectedEndpoint = igniter.query({
+  use: [AuthFeatureProcedure()],
+  handler: async ({ context }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated',
+      roles: ['member', 'admin', 'owner'] // API keys need roles specified
+    })
+    
+    // session.organization is available for both user and API key auth
+    // session.user is null for API key authentication
+    return { data: session.organization }
+  }
+})
+```
+
+### Managing API Keys
+
+Retrieve and manage keys for an organization. Remember to include `ApiKeyFeatureProcedure` in your controller's `use` array:
+
+```typescript
+// In a controller with ApiKeyFeatureProcedure in use array
+const apiKeys = await context.apikey.findManyByOrganization(orgId)
+
+// Update key status
+await context.apikey.update({
+  id: 'key_123',
+  description: 'Updated description',
+  enabled: false
+})
+
+// Delete a key
+await context.apikey.delete({
+  id: 'key_123',
+  organizationId: orgId
+})
+```
+
+## Frontend Usage (Client-side)
+
+### Listing API Keys
+
+Display organization's API keys with management options:
+
+```typescript
+// Get all API keys for the current organization
+const result = await api.apiKey.findManyByOrganization.query()
+
+if (result.error) {
+  console.error('Failed to load API keys')
+} else {
+  const apiKeys = result.data
+  // Render keys list with masked values
+}
+```
+
+### Creating New API Keys
+
+Handle API key creation with proper error handling:
+
+```typescript
+const createApiKey = async (description: string, neverExpires: boolean) => {
+  try {
+    const result = await api.apiKey.create.mutate({
+      description,
+      neverExpires,
+      enabled: true
+    })
+    
+    if (result.error) {
+      toast.error('Failed to create API key')
+      return
+    }
+    
+    // Show the key only once - copy it immediately
+    const newKey = result.data
+    navigator.clipboard.writeText(newKey.key)
+    toast.success('API key created and copied to clipboard')
+    
+    // Refresh the list
+    router.refresh()
+  } catch (error) {
+    toast.error('Error creating API key')
+  }
+}
+```
+
+### Updating API Keys
+
+Modify key properties like description or enabled status:
+
+```typescript
+const updateApiKey = async (id: string, updates: { description?: string, enabled?: boolean }) => {
+  try {
+    await api.apiKey.update.mutate({
+      id,
+      ...updates
+    })
+    toast.success('API key updated')
+  } catch (error) {
+    toast.error('Failed to update API key')
+  }
+}
+```
+
+### Deleting API Keys
+
+Permanently remove API keys with confirmation:
+
+```typescript
+const deleteApiKey = async (id: string) => {
+  if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
+    return
+  }
+  
+  try {
+    await api.apiKey.delete.mutate({ id })
+    toast.success('API key deleted')
+    router.refresh()
+  } catch (error) {
+    toast.error('Failed to delete API key')
+  }
+}
+```
+
+## API Key Authentication
+
+### Using API Keys in Requests
+
+Make authenticated requests using Bearer token authentication:
+
+```typescript
+// Example API request with API key
+const response = await fetch('/api/protected-endpoint', {
+  headers: {
+    'Authorization': 'Bearer sk_abc123def456...',
+    'Content-Type': 'application/json'
+  }
+})
+```
+
+### API Key Session Context
+
+API keys create virtual sessions with organization context:
+
+```typescript
+// API key authenticated session
+const session = await context.auth.getSession({
+  requirements: 'authenticated',
+  roles: ['member'] // Required for API key auth
+})
+
+// Available in API key sessions:
+console.log(session.organization) // Full organization object
+console.log(session.user) // null (no user for API keys)
+console.log(session.organization.billing) // Billing information included
+```
+
+
+
+## API Key Data Structure
+
+### ApiKey Interface
+
+<TypeTable
+  type={{
+    id: {
+      description: 'Unique API key identifier',
+      type: 'string',
+      default: 'UUID',
+    },
+    description: {
+      description: 'Human-readable description',
+      type: 'string',
+      default: 'Required',
+    },
+    key: {
+      description: 'The actual API key (shown only on creation)',
+      type: 'string',
+      default: 'sk_ prefixed hex string',
+    },
+    enabled: {
+      description: 'Whether the key can be used for authentication',
+      type: 'boolean',
+      default: 'true',
+    },
+    neverExpires: {
+      description: 'Whether the key has indefinite validity',
+      type: 'boolean',
+      default: 'true',
+    },
+    expiresAt: {
+      description: 'Expiration timestamp if applicable',
+      type: 'Date | null',
+      default: 'null',
+    },
+    organizationId: {
+      description: 'Owning organization identifier',
+      type: 'string',
+      default: 'Required',
+    },
+    createdAt: {
+      description: 'Key creation timestamp',
+      type: 'Date',
+      default: 'Auto-generated',
+    },
+    updatedAt: {
+      description: 'Last modification timestamp',
+      type: 'Date',
+      default: 'Auto-generated',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="API key authentication fails with UNAUTHORIZED">
+Ensure the Authorization header is properly formatted as 'Bearer sk_...' and the key exists and is enabled. Check that the endpoint requires authentication and accepts API keys.
+</Accordion>
+
+<Accordion title="API_KEY_EXPIRED error when using valid key">
+The API key has reached its expiration date. Either update the key to never expire or create a new key with a future expiration date.
+</Accordion>
+
+<Accordion title="API_KEY_REQUIRES_ORGANIZATION_ENDPOINT error">
+API key authentication requires specifying roles in getSession() call. Make sure your endpoint includes role validation when using API key auth.
+</Accordion>
+
+<Accordion title="API key not visible after creation">
+API keys are displayed only once for security. Copy and store the key immediately after creation. Use the masked preview for identification.
+</Accordion>
+
+<Accordion title="Cannot create API key - insufficient permissions">
+Only organization owners and admins can create API keys. Ensure your user has the required role in the organization.
+</Accordion>
+
+<Accordion title="API key works for some endpoints but not others">
+Check that all endpoints requiring API key auth include proper role validation in their getSession() calls. API keys need explicit role requirements.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Use descriptive names for API keys">
+Give keys clear, descriptive names like 'Production Webhook Key' or 'Development Integration' to easily identify their purpose and usage.
+</Accordion>
+
+<Accordion title="Set appropriate expiration dates">
+Use expiration dates for temporary access needs. For permanent integrations, consider 'never expires' but monitor usage regularly.
+</Accordion>
+
+<Accordion title="Store keys securely">
+Never commit API keys to version control. Use environment variables or secure secret management systems for storage.
+</Accordion>
+
+<Accordion title="Monitor key usage">
+Regularly review API key access logs and disable unused keys. Enable notifications for key creation to track new keys.
+</Accordion>
+
+<Accordion title="Use minimal required roles">
+Assign the least privileged roles needed for API key operations. Prefer 'member' over 'admin' when possible.
+</Accordion>
+
+<Accordion title="Rotate keys regularly">
+Periodically disable old keys and create new ones, especially for production environments, to maintain security.
+</Accordion>
+
+<Accordion title="Implement rate limiting">
+Consider implementing rate limiting on API endpoints that accept API key authentication to prevent abuse.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Authentication & Sessions](../authentication-and-sessions) - How API keys integrate with the authentication system
+- [Organizations and Tenancy](../organizations-and-tenancy) - Organization-scoped API key access
+- [Notifications](../notifications) - API key creation notifications
+- [Jobs & Queues](../jobs-and-queues) - Background processing with API key authentication
+
+## API Reference
+
+### API Key Endpoints
+
+<TypeTable
+  type={{
+    'GET /api-key': {
+      description: 'List all API keys for the organization',
+      type: 'ApiKey[]',
+      default: 'Requires owner/admin role',
+    },
+    'GET /api-key/:id': {
+      description: 'Get specific API key details',
+      type: 'ApiKey',
+      default: 'Requires owner/admin role',
+    },
+    'POST /api-key': {
+      description: 'Create a new API key',
+      type: 'ApiKey',
+      default: 'Requires owner/admin role',
+    },
+    'PUT /api-key/:id': {
+      description: 'Update API key properties',
+      type: 'ApiKey',
+      default: 'Requires owner/admin role',
+    },
+    'DELETE /api-key/:id': {
+      description: 'Delete an API key permanently',
+      type: 'void',
+      default: 'Requires owner/admin role',
+    },
+  }}
+/>
+
+### Authentication Headers
+
+<TypeTable
+  type={{
+    'Authorization': {
+      description: 'Bearer token authentication header',
+      type: 'string',
+      default: 'Bearer sk_...',
+    },
+  }}
+/>

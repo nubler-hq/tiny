@@ -1,0 +1,199 @@
+---
+title: Running Locally
+description: Start Docker services, migrate the database, and launch the Next.js dev server.
+---
+
+Congratulations on setting up your environment variables! Now it's time to bring your SaaS Boilerplate application to life on your local machine. This guide will walk you through starting the necessary services, preparing your database, and launching the development server. We'll explain each step so you understand what's happening behind the scenes, and provide tips for troubleshooting common issues. By the end, you'll have a fully functional app running at `http://localhost:3000`, ready for development and testing.
+
+## Prerequisites
+
+Before diving in, ensure you've completed the [Environment Setup](../environment-setup) guide. You'll need:
+
+- A properly configured `.env` file with at least the core variables (like `DATABASE_URL` and `BETTER_AUTH_SECRET`).
+- Docker Desktop installed and running, as we'll use it for the database.
+- Node.js and your package manager (npm, pnpm, or yarn) ready.
+
+If you haven't done this yet, go back and follow the environment setup—it's essential for everything to work smoothly.
+
+## Why These Steps Matter
+
+Running a modern web app like the SaaS Boilerplate involves multiple moving parts: a database for data storage, background services for tasks, and the app itself. We'll start the database first (using Docker), then prepare it with your schema, and finally launch the app. This ensures everything is connected and ready. Think of it like starting a car: fuel (database), engine check (migrations), and ignition (dev server).
+
+## Starting Your Local Environment
+
+Follow these steps in order. Each one builds on the previous, and we'll explain what each command does and why it's necessary.
+
+<Steps>
+<Step>
+
+### Start Dependencies with Docker
+
+The first step is to launch your local database and any other services. The boilerplate uses Docker Compose to manage this easily.
+
+Run this command in your terminal:
+
+```bash
+npm run docker:up
+```
+
+**What this does**: This script starts PostgreSQL (your database) and possibly Redis (for caching/jobs) in Docker containers. Docker Compose reads `docker-compose.yml` to know what to run.
+
+**Why it's needed**: Your app needs a database to store users, sessions, and app data. Running it in Docker means you don't have to install PostgreSQL directly on your machine, keeping things clean and isolated.
+
+**What to expect**: You'll see output like "Starting postgres... done." It might take a minute the first time as Docker downloads images. Once complete, PostgreSQL will be running on `localhost:5432`.
+
+**Troubleshooting tip**: If it fails, ensure Docker Desktop is open and running. Check `docker ps` to see if containers started. If ports conflict, edit `docker-compose.yml` to use different ports.
+
+</Step>
+
+<Step>
+
+### Apply Database Migrations
+
+With the database running, you need to set up its structure—creating tables for users, sessions, etc.
+
+Run:
+
+```bash
+npm run db:migrate:dev
+```
+
+**What this does**: This uses Prisma (the database toolkit) to run migration files. Migrations are like blueprints that define your database schema.
+
+**Why it's needed**: Without tables, your app can't save data. This step creates the necessary structure based on `prisma/schema.prisma`.
+
+**What to expect**: Output like "Applying migration..." and success messages. If it's your first time, it might create initial data.
+
+**Troubleshooting tip**: If it says "connection refused," double-check `DATABASE_URL` in `.env` and ensure Docker is running. Run `npm run db:studio` to inspect the database manually.
+
+</Step>
+
+<Step>
+
+### Start the Development Server
+
+Now, launch the Next.js app itself.
+
+Run:
+
+```bash
+npm run dev
+```
+
+**What this does**: This starts the Next.js development server, which compiles your code, serves it at `http://localhost:3000`, and enables hot reloading (changes update automatically).
+
+**Why it's needed**: This is your app! Without it, you can't access the frontend or API.
+
+**What to expect**: Messages like "Ready - started server on 0.0.0.0:3000" and "Compiled successfully." Open `http://localhost:3000` in your browser to see the app.
+
+**Troubleshooting tip**: If port 3000 is busy, Next.js will suggest an alternative. Check for errors in the console—missing env vars often cause issues.
+
+</Step>
+
+<Step>
+
+### Optional: Inspect the Database
+
+To see what's in your database, open Prisma Studio.
+
+Run:
+
+```bash
+npm run db:studio
+```
+
+**What this does**: Launches a web interface at `http://localhost:5555` for browsing and editing database data.
+
+**Why it's useful**: Great for debugging—see users, sessions, etc. Without affecting production.
+
+**What to expect**: A browser window opens with your tables. You can view/edit data safely.
+
+</Step>
+
+<Step>
+
+### Optional: Set Up Billing Webhooks
+
+If testing payments, start a local webhook listener for Stripe.
+
+Run:
+
+```bash
+npm run stripe:webhook
+```
+
+**What this does**: Uses the Stripe CLI to forward webhooks from Stripe to your local app.
+
+**Why it's useful**: Stripe sends events (like "payment succeeded") via webhooks. This lets you test them locally.
+
+**What to expect**: A tunnel URL and webhook secret. Update `STRIPE_WEBHOOK_SECRET` in `.env` if needed.
+
+**Troubleshooting tip**: Requires Stripe CLI installed. Ensure your app's webhook endpoint is set up.
+
+</Step>
+</Steps>
+
+## Verifying Your Setup
+
+Once everything is running, verify it works:
+
+- **App loads**: Visit `http://localhost:3000`—you should see the homepage.
+- **Docs accessible**: Go to `http://localhost:3000/docs` for built-in documentation.
+- **Database connected**: Try signing up a user or checking Prisma Studio.
+- **API responds**: Test an endpoint, like `/api/health`, if available.
+
+If anything fails, check the troubleshooting section below.
+
+## Troubleshooting
+
+Running locally can sometimes hit snags. Here's how to resolve the most frequent problems:
+
+<Accordions type="multiple">
+<Accordion title="Docker not starting">
+Ensure Docker Desktop is installed and running. On macOS/Windows, it might need permissions. Try `docker --version` to confirm.
+</Accordion>
+<Accordion title="Database connection errors">
+Verify `DATABASE_URL` matches your Docker setup. Run `docker logs <container-name>` for clues. Restart containers with `npm run docker:down` then `npm run docker:up`.
+</Accordion>
+<Accordion title="Migrations fail">
+Check if PostgreSQL is ready—wait a few seconds after `docker:up`. Ensure no other apps use port 5432.
+</Accordion>
+<Accordion title="App won't start">
+Look for "Missing environment variable" errors. Restart after `.env` changes. Clear cache with `rm -rf .next` if needed.
+</Accordion>
+<Accordion title="Hot reload not working">
+Stop and restart `npm run dev`. Check file permissions.
+</Accordion>
+<Accordion title="Stripe webhook issues">
+Confirm CLI is logged in (`stripe login`). Ensure endpoint URL is correct in Stripe dashboard.
+</Accordion>
+</Accordions>
+
+For more help, check the [Next.js local development docs](https://nextjs.org/docs/getting-started/installation#run-the-development-server) or [Docker troubleshooting](https://docs.docker.com/desktop/troubleshoot/overview/).
+
+## Next Steps
+
+<Cards>
+  <Card title="Develop Features" href="#develop-features">
+  Edit code and see changes instantly with hot reload.
+  </Card>
+  <Card title="Test Integrations" href="#test-integrations">
+  Try auth, billing, file uploads, and more.
+  </Card>
+  <Card title="Debug" href="#debug">
+  Use browser dev tools and console logs.
+  </Card>
+  <Card title="Deploy" href="../first-deploy">
+  When ready, follow the First Deploy guide.
+  </Card>
+</Cards>
+
+If you stop development, shut down with `Ctrl+C` in terminals and `npm run docker:down` to clean up.
+
+## See Also
+
+- [Environment Setup](../environment-setup) - Configure your `.env` file.
+- [Quickstart](../quickstart) - Overview of getting started.
+- [First Deploy](../first-deploy) - Move to production.
+- [Architecture Overview](../../architecture/directory-structure) - Understand the codebase.
+- [Testing](../../development/testing) - How to test your changes.

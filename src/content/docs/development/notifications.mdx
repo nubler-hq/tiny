@@ -1,0 +1,529 @@
+---
+title: Notifications
+description: In-app and email notifications with templates, real-time streaming, and user preferences.
+---
+
+By the end of this guide, you'll understand how to implement a comprehensive notification system that delivers in-app and email notifications with real-time streaming, user preferences, and customizable templates.
+
+## Overview
+
+The SaaS Boilerplate includes a powerful notification system that supports multiple delivery channels and provides real-time updates. Key features include:
+
+- **Multi-channel delivery**: In-app notifications and email delivery
+- **Real-time streaming**: Automatic UI updates when new notifications arrive
+- **User preferences**: Granular control over notification types and channels
+- **Template system**: Predefined notification types with dynamic content
+- **Organization scoping**: Proper data isolation for multi-tenant applications
+- **Read status tracking**: Mark notifications as read with bulk operations
+
+The system integrates deeply with authentication and automatically includes notification data in user sessions for seamless access control.
+
+## Architecture
+
+### Notification Service
+
+The core of the notification system is the `NotificationService` class, which orchestrates all notification operations:
+
+```typescript
+// src/services/notification.ts
+const notification = new NotificationService({
+  context: {} as NotificationContext,
+  channels: {
+    'email': { /* email delivery logic */ },
+    'in-app': { /* database storage logic */ }
+  },
+  templates: {
+    USER_INVITED: { /* template definition */ },
+    LEAD_CREATED: { /* template definition */ },
+    // ... more templates
+  }
+})
+```
+
+### Channels
+
+Notifications can be delivered through multiple channels:
+
+- **Email**: Uses the mail service to send HTML emails with templates
+- **In-app**: Stores notifications in the database for UI display
+
+### Templates
+
+Each notification type has a predefined template with:
+
+- Zod schema for data validation
+- Dynamic title and description functions
+- Action buttons with URLs
+- Supported channels
+- Help text for user preferences
+
+## Setting Up Notifications
+
+<Steps>
+<Step>
+### Configure Notification Service
+
+The notification service is automatically configured in `src/services/notification.ts` with channels and templates. It's available in the Igniter context at `context.services.notification`.
+</Step>
+
+<Step>
+### Use Notification Controller
+
+The notification controller provides REST endpoints for managing notifications. Enable real-time streaming by setting `stream: true` in query definitions.
+</Step>
+
+<Step>
+### Configure User Preferences
+
+Users can customize notification delivery preferences through the API endpoints. Preferences are stored in user metadata.
+</Step>
+</Steps>
+
+## Notification Templates
+
+The system includes predefined templates for common events:
+
+<TypeTable
+  type={{
+    USER_INVITED: {
+      description: 'User invited to organization',
+      channels: 'email, in-app',
+      data: 'organizationName, inviterName, role',
+    },
+    BILLING_SUCCESS: {
+      description: 'Successful billing payment',
+      channels: 'email, in-app',
+      data: 'amount, currency, planName',
+    },
+    LEAD_CREATED: {
+      description: 'New lead created',
+      channels: 'email, in-app',
+      data: 'leadName, leadEmail, source',
+    },
+    MEMBER_JOINED: {
+      description: 'New member joined organization',
+      channels: 'email, in-app',
+      data: 'memberName, memberEmail, role',
+    },
+    SUBSCRIPTION_CREATED: {
+      description: 'New subscription created',
+      channels: 'email, in-app',
+      data: 'planName, amount, currency',
+    },
+  }}
+/>
+
+### Template Structure
+
+Each template defines:
+
+```typescript
+USER_INVITED: {
+  channels: ['email', 'in-app'],
+  title: 'User Invited',
+  description: 'You have been invited to join an organization',
+  help: 'When a user is invited to an organization',
+  action: {
+    label: 'Accept',
+    url: '/app/invites'
+  },
+  schema: z.object({
+    organizationName: z.string(),
+    inviterName: z.string(),
+    role: z.string()
+  })
+}
+```
+
+## Backend Usage (Procedures & Controllers)
+
+### Sending Notifications
+
+Trigger notifications from your backend business logic:
+
+```typescript
+// In a procedure or controller
+await context.services.notification.send({
+  type: 'USER_INVITED',
+  data: {
+    organizationName: organization.name,
+    inviterName: session.user.name,
+    role: invitation.role
+  },
+  context: {
+    recipientId: invitation.email, // Send to specific user
+    organizationId: organization.id
+  }
+})
+```
+
+### Organization-wide Notifications
+
+Send notifications to all members of an organization:
+
+```typescript
+// Notify all organization members
+await context.services.notification.send({
+  type: 'LEAD_CREATED',
+  data: {
+    leadName: lead.name,
+    leadEmail: lead.email,
+    source: 'website'
+  },
+  context: {
+    organizationId: session.organization.id // Notify all members
+  }
+})
+```
+
+### Error Handling
+
+Always wrap notification sending in error handling:
+
+```typescript
+// Graceful error handling
+try {
+  await context.services.notification.send({
+    type: 'BILLING_SUCCESS',
+    data: { amount: 29.99, currency: 'USD', planName: 'Pro' },
+    context: { recipientId: userId, organizationId: orgId }
+  })
+} catch (error) {
+  // Log error but don't break main flow
+  console.error('Notification failed:', error)
+}
+```
+
+## Frontend Usage (Client-side)
+
+### Listing Notifications
+
+Retrieve paginated notifications with filtering:
+
+```typescript
+// Get first page of unread notifications
+const result = await api.notification.list.query({
+  limit: 20,
+  page: 1,
+  unreadOnly: true
+})
+
+// Access pagination data
+const { notifications, pagination } = result.data
+console.log(`Page ${pagination.page} of ${pagination.totalPages}`)
+```
+
+### Read Status Management
+
+Mark notifications as read individually or in bulk:
+
+```typescript
+// Mark specific notification as read
+await api.notification.markAsRead.mutate({
+  id: 'notif_123'
+})
+
+// Mark all notifications as read
+await api.notification.markAllAsRead.mutate()
+// Returns: { updatedCount: 5, message: "5 notifications marked as read" }
+```
+
+### Unread Count
+
+Get count of unread notifications for UI badges:
+
+```typescript
+// Get unread count
+const { count } = await api.notification.unreadCount.query()
+
+// Update UI badge
+updateNotificationBadge(count)
+```
+
+### User Preferences
+
+Manage notification delivery preferences:
+
+```typescript
+// Get user preferences
+const { types } = await api.notification.getUserPreferences.query()
+
+// Update preferences
+await api.notification.updateNotificationPreferences.mutate({
+  preferences: {
+    USER_INVITED: { inApp: true, email: false },
+    LEAD_CREATED: { inApp: true, email: true }
+  }
+})
+```
+
+## Real-time Streaming
+
+### Automatic Updates
+
+Notifications support real-time streaming for instant UI updates:
+
+```typescript
+// In a React component
+function NotificationList() {
+  const { data } = api.notification.list.useQuery({
+    limit: 20,
+    unreadOnly: true
+  })
+
+  // Component automatically re-renders when new notifications arrive
+  return (
+    <div>
+      {data?.notifications.map(notification => (
+        <NotificationItem key={notification.id} {...notification} />
+      ))}
+    </div>
+  )
+}
+```
+
+### Streaming Configuration
+
+Enable streaming in query definitions:
+
+```typescript
+list: igniter.query({
+  path: '/',
+  stream: true, // Enables real-time updates
+  use: [AuthFeatureProcedure(), NotificationProcedure()],
+  handler: async ({ context, response }) => {
+    // Handler returns data that gets streamed to clients
+  }
+})
+```
+
+## Practical Examples
+
+### Backend: Lead Creation Notifications
+
+Automatically notify team members when new leads are created:
+
+```typescript
+// In lead creation controller/procedure
+export const createLead = igniter.mutation({
+  // ... other config
+  handler: async ({ context, request, response }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated'
+    })
+
+    // Create the lead
+    const lead = await context.database.lead.create({
+      data: request.body
+    })
+
+    // Send notification to all organization members
+    await context.services.notification.send({
+      type: 'LEAD_CREATED',
+      data: {
+        leadName: lead.name,
+        leadEmail: lead.email,
+        source: 'website'
+      },
+      context: {
+        organizationId: session.organization.id
+      }
+    })
+
+    return response.created(lead)
+  }
+})
+```
+
+### Frontend: Notification Center Component
+
+Build a complete notification center:
+
+```typescript
+function NotificationCenter() {
+  const [unreadCount, setUnreadCount] = useState(0)
+  const { data: notifications } = api.notification.list.useQuery({
+    limit: 50,
+    unreadOnly: false
+  })
+
+  // Update badge count
+  useEffect(() => {
+    api.notification.unreadCount.query().then(result => {
+      setUnreadCount(result.data.count)
+    })
+  }, [])
+
+  return (
+    <div className="notification-center">
+      <div className="header">
+        <h3>Notifications</h3>
+        <Badge count={unreadCount} />
+      </div>
+
+      <div className="notifications">
+        {notifications?.data.notifications.map(notification => (
+          <NotificationItem
+            key={notification.id}
+            notification={notification}
+            onMarkAsRead={() => api.notification.markAsRead.mutate({
+              id: notification.id
+            })}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+## Notification Data Structure
+
+### Notification Object
+
+<TypeTable
+  type={{
+    id: {
+      description: 'Unique notification identifier',
+      type: 'string',
+      default: 'Auto-generated',
+    },
+    type: {
+      description: 'Notification template type',
+      type: 'string',
+      default: 'Required',
+    },
+    data: {
+      description: 'Template-specific data payload',
+      type: 'Record<string, any>',
+      default: 'Required',
+    },
+    recipientId: {
+      description: 'User ID of recipient',
+      type: 'string',
+      default: 'Required',
+    },
+    organizationId: {
+      description: 'Organization ID for scoping',
+      type: 'string',
+      default: 'Required',
+    },
+    readAt: {
+      description: 'Timestamp when marked as read',
+      type: 'Date | null',
+      default: 'null',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Notifications not appearing in UI">
+Check that the notification was sent with correct recipientId and organizationId. Verify the user has access to the organization and the notification controller is properly configured.
+</Accordion>
+
+<Accordion title="Email notifications not sending">
+Ensure the mail service is properly configured. Check that the recipient has a valid email address and the notification template includes email in its channels array.
+</Accordion>
+
+<Accordion title="Real-time updates not working">
+Verify that `stream: true` is set in the query definition. Check that the client is properly connected and the notification list query is being called with streaming enabled.
+</Accordion>
+
+<Accordion title="User preferences not saving">
+Ensure the user metadata is being updated correctly. Check that the UserMetadataSchema includes the notifications field and the updateMetadataSafe function is working properly.
+</Accordion>
+
+<Accordion title="Template validation errors">
+Verify that the data passed to notification.send() matches the Zod schema defined in the template. Check for required fields and correct data types.
+</Accordion>
+
+<Accordion title="Organization notifications not working">
+When sending to an organization (without recipientId), ensure the organization exists and has members. The notification will be sent to all organization members.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Use appropriate channels">
+Choose email for important notifications and in-app for real-time updates. Consider user preferences when selecting channels.
+</Accordion>
+
+<Accordion title="Handle errors gracefully">
+Wrap notification sending in try-catch blocks. Don't let notification failures break your main business logic.
+</Accordion>
+
+<Accordion title="Validate data before sending">
+Always validate notification data against the template schema before calling send(). This ensures type safety and prevents runtime errors.
+</Accordion>
+
+<Accordion title="Consider user preferences">
+Check user notification preferences before sending. Respect their choices about email vs in-app delivery.
+</Accordion>
+
+<Accordion title="Use organization context">
+When sending organization-wide notifications, use organizationId without recipientId to notify all members.
+</Accordion>
+
+<Accordion title="Implement proper pagination">
+For notification lists, always implement pagination to handle large numbers of notifications efficiently.
+</Accordion>
+
+<Accordion title="Clean up old notifications">
+Implement a cleanup strategy for old notifications to prevent database bloat. Consider archiving instead of deleting.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Authentication & Sessions](../authentication-and-sessions) - How notifications integrate with user sessions
+- [Email](../email) - Email delivery system used by notifications
+- [Organizations and Tenancy](../organizations-and-tenancy) - Organization-scoped notifications
+- [Jobs & Queues](../jobs-and-queues) - Background processing for bulk notifications
+- [Content Layer](../content-layer) - MDX content system for notification templates
+
+## API Reference
+
+### Notification Endpoints
+
+<TypeTable
+  type={{
+    'GET /notification': {
+      description: 'List notifications with pagination',
+      type: 'NotificationWithPagination',
+      default: 'Requires auth',
+    },
+    'PATCH /notification/:id/read': {
+      description: 'Mark notification as read',
+      type: 'Notification',
+      default: 'Requires auth',
+    },
+    'PATCH /notification/read-all': {
+      description: 'Mark all notifications as read',
+      type: '{updatedCount, message}',
+      default: 'Requires auth',
+    },
+    'GET /notification/unread-count': {
+      description: 'Get unread notification count',
+      type: '{count}',
+      default: 'Requires auth',
+    },
+    'DELETE /notification/:id': {
+      description: 'Delete notification',
+      type: '{message}',
+      default: 'Requires auth',
+    },
+    'GET /notification/user-preferences': {
+      description: 'Get notification preferences',
+      type: '{types}',
+      default: 'Requires auth',
+    },
+    'PATCH /notification/preferences': {
+      description: 'Update notification preferences',
+      type: '{preferences, message}',
+      default: 'Requires auth',
+    },
+  }}
+/>

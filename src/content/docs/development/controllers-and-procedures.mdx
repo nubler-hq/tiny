@@ -1,0 +1,355 @@
+---
+title: Controllers & Procedures
+description: Learn how to design typed APIs with Igniter controllers, implement rigorous validation with Zod, and generate comprehensive OpenAPI documentation.
+---
+
+By the end of this guide, you'll understand how to create feature-scoped controllers, implement business logic through procedures, validate inputs with Zod schemas, and expose well-documented APIs through OpenAPI.
+
+## Before You Begin
+
+**Basic Knowledge**: Familiarity with TypeScript, REST APIs, and basic Node.js concepts
+**Prerequisites**: Understanding of the [Authentication & Sessions](./authentication-and-sessions) and [Roles & Permissions](./roles-and-permissions) concepts
+**Environment**: A running SaaS Boilerplate instance with database configured
+**Optional**: Experience with Zod for schema validation
+
+## Core Concepts
+
+The SaaS Boilerplate uses Igniter as its API framework, providing a structured approach to building type-safe, well-documented APIs. Controllers and procedures work together to create a layered architecture that separates concerns while maintaining type safety throughout the application.
+
+### Controllers as Feature Boundaries
+
+Controllers serve as the entry point for API endpoints within each feature. They are feature-scoped, meaning each business domain (leads, organizations, billing) has its own controller that groups related endpoints. Controllers handle:
+
+- **Request Routing**: Mapping HTTP methods and paths to handler functions
+- **Input Validation**: Using Zod schemas to validate and parse request data
+- **Authentication Guards**: Enforcing role-based access control
+- **Response Formatting**: Standardizing API responses
+- **Procedure Orchestration**: Coordinating calls to business logic procedures
+
+### Procedures as Business Logic Layer
+
+Procedures encapsulate the business logic and data access operations. They are injected into the Igniter context, making them available to controllers while maintaining clean separation of concerns. Procedures handle:
+
+- **Data Operations**: CRUD operations on database entities
+- **Business Rules**: Domain-specific validation and logic
+- **Side Effects**: Notifications, integrations, and external service calls
+- **Data Transformation**: Converting between database and API formats
+- **Error Handling**: Business logic errors and edge cases
+
+### Schema-Driven Validation
+
+Input validation is handled through Zod schemas that provide runtime type checking and automatic TypeScript inference. This ensures:
+
+- **Type Safety**: Compile-time guarantees about data structures
+- **Runtime Validation**: Automatic parsing and validation of request data
+- **Documentation**: Schemas generate OpenAPI documentation automatically
+- **Developer Experience**: IntelliSense and autocompletion in IDEs
+
+### OpenAPI Documentation
+
+The framework automatically generates comprehensive OpenAPI documentation from your controllers and schemas. This provides:
+
+- **API Discovery**: Interactive documentation for developers
+- **Type Generation**: Client SDK generation for different languages
+- **Testing**: Built-in API testing interfaces
+- **Contract Definition**: Clear API contracts between frontend and backend
+
+## Data Models
+
+The controller and procedure system defines several key interfaces and types that govern API structure and validation.
+
+<TypeTable
+  type={{
+    Controller: {
+      description: 'Feature-scoped container for related API endpoints with shared configuration',
+      type: 'Object with name, path, description, and actions',
+    },
+    Procedure: {
+      description: 'Business logic handler injected into Igniter context for data operations',
+      type: 'Function returning context extension object',
+    },
+    ZodSchema: {
+      description: 'Runtime type validation and parsing schema for request/response data',
+      type: 'Zod object with validation rules and TypeScript inference',
+    },
+    IgniterAction: {
+      description: 'Individual API endpoint definition with method, path, validation, and handler',
+      type: 'Object with HTTP method, path, middleware, and handler function',
+    },
+  }}
+/>
+
+## A Practical Example
+
+Let's explore how the Lead feature is implemented in the SaaS Boilerplate as a complete example of controllers and procedures working together. This feature demonstrates the full lifecycle of creating a business domain with proper validation, authentication, and organization scoping.
+
+<Steps>
+<Step>
+
+### Feature Directory Structure
+
+The Lead feature is organized under `src/features/lead/` with the following structure:
+
+import { Files, Folder, File } from 'fumadocs-ui/components/files'
+
+<Files>
+  <Folder name="src" defaultOpen>
+    <Folder name="features" defaultOpen>
+      <Folder name="lead" defaultOpen>
+        <File name="lead.interface.ts" />
+        <Folder name="controllers" defaultOpen>
+          <File name="lead.controller.ts" />
+        </Folder>
+        <Folder name="procedures" defaultOpen>
+          <File name="lead.procedure.ts" />
+        </Folder>
+      </Folder>
+    </Folder>
+  </Folder>
+</Files>
+
+</Step>
+
+<Step>
+
+### Feature Interfaces
+
+The lead interfaces define the data models and Zod validation schemas:
+
+
+```ts
+// src/features/lead/lead.interface.ts
+// Feature interfaces define data models and validation schemas
+export interface Lead {
+  id: string
+  email: string
+  name: string | null
+  phone: string | null
+  metadata: any | null
+  organizationId: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Zod schemas for runtime validation
+export const LeadCreationSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  name: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  metadata: z.any().optional().nullable(),
+})
+```
+
+</Step>
+
+<Step>
+
+### Business Logic Procedure
+
+The LeadProcedure encapsulates all data operations and business rules:
+
+
+```ts
+// src/features/lead/procedures/lead.procedure.ts
+export const LeadProcedure = igniter.procedure({
+  name: 'LeadProcedure',
+  handler: (_, { context }) => {
+    return {
+      lead: {
+        findMany: async (organizationId: string): Promise<Lead[]> => {
+          return context.services.database.lead.findMany({
+            where: { organizationId },
+          })
+        },
+
+        create: async (organizationId: string, data: CreateLeadBody): Promise<Lead> => {
+          const lead = await context.services.database.lead.create({
+            data: { ...data, organizationId },
+          })
+
+          // Business logic: Trigger notifications for new leads
+          await context.services.notification.send({
+            type: 'LEAD_CREATED',
+            context: { organizationId },
+            data: { leadName: lead.name, leadEmail: lead.email },
+          })
+
+          return lead
+        },
+      },
+    }
+  },
+})
+```
+
+</Step>
+
+<Step>
+
+### Feature Controller
+
+The LeadController exposes RESTful API endpoints:
+
+
+```ts
+// src/features/lead/controllers/lead.controller.ts
+export const LeadController = igniter.controller({
+  name: 'Lead',
+  path: '/leads',
+  description: 'Manage customer leads.',
+  actions: {
+    list: igniter.query({
+      name: 'List',
+      description: 'List all leads for an organization.',
+      path: '/',
+      use: [AuthFeatureProcedure(), LeadProcedure()],
+      query: LeadQuerySchema,
+      handler: async ({ context, response }) => {
+        const session = await context.auth.getSession({
+          requirements: 'authenticated',
+          roles: ['admin', 'owner', 'member'],
+        })
+
+        if (!session || !session.organization) {
+          return response.unauthorized('Authentication required')
+        }
+
+        const leads = await context.lead.findMany(session.organization.id)
+        return response.success(leads)
+      },
+    }),
+
+    create: igniter.mutation({
+      name: 'Create',
+      description: 'Create a new lead.',
+      path: '/',
+      method: 'POST',
+      use: [AuthFeatureProcedure(), LeadProcedure(), IntegrationFeatureProcedure()],
+      body: LeadCreationSchema,
+      handler: async ({ context, request, response }) => {
+        const session = await context.auth.getSession({
+          requirements: 'authenticated',
+          roles: ['admin', 'owner', 'member'],
+        })
+
+        const lead = await context.lead.create(session.organization!.id, request.body)
+        return response.created(lead)
+      },
+    }),
+  },
+})
+```
+
+</Step>
+
+<Step>
+
+### Controller Registration
+
+The LeadController is registered in the main application router:
+
+
+```ts
+// src/igniter.router.ts
+export const AppRouter = igniter.router({
+  controllers: {
+    // SaaS Boilerplate controllers
+    auth: AuthController,
+    organization: OrganizationController,
+    membership: MembershipController,
+
+    // Custom feature controllers
+    lead: LeadController,
+    submission: SubmissionController,
+
+    // ... other controllers
+  },
+})
+```
+
+</Step>
+
+<Step>
+
+### Schema and Documentation Generation
+
+The CLI commands generate TypeScript schemas and OpenAPI documentation:
+
+```bash
+# Generate TypeScript schema for type safety
+npx @igniter-js/cli generate schema
+
+# Generate OpenAPI documentation
+npx @igniter-js/cli generate docs
+```
+
+</Step>
+
+<Step>
+
+### Testing with Igniter Studio
+
+Test the Lead endpoints through the interactive API documentation at `http://localhost:3000/api/v1/docs`.
+
+</Step>
+</Steps>
+
+
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Controller endpoints not appearing in OpenAPI docs">
+Ensure your controller is properly registered in `AppRouter` and that all Zod schemas are correctly imported. Check that the Igniter instance is configured with the correct OpenAPI path.
+
+</Accordion>
+<Accordion title="Zod validation errors not showing proper messages">
+Verify that your Zod schemas include descriptive error messages using `.describe()` or custom error maps. Make sure the schema is properly attached to the controller action's `body` or `query` parameter.
+
+</Accordion>
+<Accordion title="Procedure methods not available in controller context">
+Check that your procedure is included in the controller's `use` array. Ensure the procedure name matches what's being accessed in the handler (e.g., `context.lead.findMany`).
+
+</Accordion>
+<Accordion title="TypeScript errors about missing properties">
+Make sure your procedure returns the correct structure that matches how it's accessed in controllers. Verify that all context services and database models are properly typed.
+
+</Accordion>
+<Accordion title="Authentication middleware not working">
+Ensure `AuthFeatureProcedure` is included in the `use` array before other procedures that depend on authentication. Check that role requirements are properly specified in the session call.
+
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Controller Organization">
+Keep controllers feature-scoped and focused on a single business domain. Group related endpoints within the same controller. Use consistent naming patterns for actions (list, create, retrieve, update, delete).
+
+</Accordion>
+<Accordion title="Procedure Design">
+Keep procedures focused on business logic and data operations. Avoid HTTP-specific concerns in procedures. Use meaningful names that describe the business operation, not the technical implementation.
+
+</Accordion>
+<Accordion title="Schema Validation">
+Always validate inputs with Zod schemas, never trust client data. Use descriptive error messages in schemas. Leverage Zod's type inference for automatic TypeScript types. Keep schemas DRY by reusing common patterns.
+
+</Accordion>
+<Accordion title="Error Handling">
+Use consistent error response patterns across all endpoints. Provide meaningful error messages for API consumers. Log errors appropriately for debugging while avoiding sensitive information exposure.
+
+</Accordion>
+<Accordion title="Documentation">
+Write clear, descriptive names and descriptions for all endpoints. Include examples in JSDoc comments. Keep OpenAPI documentation up-to-date by maintaining accurate schemas and descriptions.
+
+</Accordion>
+<Accordion title="Security">
+Always include authentication checks for protected endpoints. Use role-based access control consistently. Validate organization ownership for multi-tenant operations. Implement proper input sanitization.
+
+</Accordion>
+<Accordion title="Performance">
+Use appropriate HTTP methods (GET for reads, POST for creates, etc.). Implement pagination for list endpoints. Cache expensive operations when appropriate. Monitor and optimize database queries.
+
+</Accordion>
+</Accordions>

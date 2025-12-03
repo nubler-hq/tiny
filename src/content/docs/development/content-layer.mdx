@@ -1,0 +1,435 @@
+---
+title: Content Layer
+description: Create and manage static content with MDX and FumaDocs for blog, help, docs, and updates.
+---
+
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Files, Folder, File } from 'fumadocs-ui/components/files';
+
+By the end of this guide, you'll understand how to create and manage static content in your SaaS application using MDX and FumaDocs. You'll learn to author documentation, blog posts, help articles, and product updates that automatically render with rich components, proper SEO, and seamless navigation.
+
+## Overview
+
+The SaaS Boilerplate includes a comprehensive content management system that lets you create static content without touching code. This system powers four main content types:
+
+- **Documentation** (`/docs`) - Technical guides and API references using FumaDocs
+- **Blog** (`/blog`) - Company news, tutorials, and announcements  
+- **Help Center** (`/help`) - User-facing support articles and FAQs
+- **Product Updates** (`/updates`) - Changelog and feature announcements
+
+All content uses MDX (Markdown + JSX) for rich formatting with interactive components. The system automatically handles routing, SEO metadata, navigation, and responsive design.
+
+## How It Works
+
+The content layer uses FumaDocs to transform MDX files into fully-featured web pages. Here's the architecture:
+
+### Configuration Layer
+Content is configured in `source.config.ts` with different schemas for each content type:
+
+```typescript
+// source.config.ts
+export const docs = defineDocs({
+  dir: 'src/content/docs',
+  docs: {
+    postprocess: {
+      includeProcessedMarkdown: true,
+    },
+  },
+})
+
+export const blog = defineDocs({
+  dir: 'src/content/blog', 
+  docs: {
+    schema: frontmatterSchema.extend({
+      cover: z.url().optional(),
+      tags: z.array(z.string()).optional(),
+    }),
+  },
+})
+```
+
+### Rendering Pipeline
+Each content type has dedicated pages that load content via FumaDocs loaders:
+
+```typescript
+// src/app/(site)/(content)/docs/source.ts
+export const source = loader({
+  baseUrl: '/docs',
+  source: docs.toFumadocsSource(),
+})
+```
+
+### Component System
+MDX files use custom components defined in `mdx-components.tsx`:
+
+```typescript
+// mdx-components.tsx
+export function getMDXComponents(components?: MDXComponents): MDXComponents {
+  return {
+    ...defaultMdxComponents,
+    Accordion, Accordions, Banner, Step, Steps,
+    TypeTable, File, Folder, Files,
+    // ... more components
+  }
+}
+```
+
+## Content Types
+
+<Accordions type="multiple">
+<Accordion title="Documentation (/docs)">
+Technical documentation with advanced features like search, table of contents, and code syntax highlighting. Uses FumaDocs for optimal developer experience.
+
+**Features:**
+- Auto-generated navigation sidebar
+- Full-text search
+- Code syntax highlighting
+- Responsive table of contents
+- Cross-references between pages
+
+**Frontmatter Schema:**
+- `title` (string) - Page title
+- `description` (string) - SEO description
+- `full` (boolean, optional) - Full-width layout
+</Accordion>
+
+<Accordion title="Blog (/blog)">
+Company blog for news, tutorials, and announcements. Supports rich media and categorization.
+
+**Features:**
+- Article listing with pagination
+- Tag-based filtering
+- Cover images
+- Publication dates
+- Social sharing
+
+**Frontmatter Schema:**
+- `title` (string) - Article title
+- `description` (string) - SEO description
+- `date` (string) - Publication date (ISO format)
+- `tags` (string[], optional) - Article tags
+- `cover` (string, optional) - Cover image URL
+</Accordion>
+
+<Accordion title="Help Center (/help)">
+User-facing support content organized by categories. Designed for self-service support.
+
+**Features:**
+- Category-based organization
+- Search functionality
+- FAQ-style accordions
+- Step-by-step guides
+- Contact integration
+
+**Frontmatter Schema:**
+- `title` (string) - Article title
+- `description` (string) - SEO description
+- `date` (string, optional) - Publication date
+- `tags` (string[], optional) - Help tags
+</Accordion>
+
+<Accordion title="Product Updates (/updates)">
+Changelog and feature announcements. Keeps users informed about new features and improvements.
+
+**Features:**
+- Timeline view
+- Feature highlights
+- Release notes
+- Status updates
+
+**Frontmatter Schema:**
+- `title` (string) - Update title
+- `cover` (string, optional) - Cover image
+</Accordion>
+</Accordions>
+
+## Creating Content
+
+<Steps>
+<Step>
+### Choose Content Type
+Decide where your content belongs based on audience and purpose:
+
+- **Docs**: Technical content for developers/integrators
+- **Blog**: Marketing content, tutorials, announcements
+- **Help**: User support, troubleshooting, FAQs
+- **Updates**: Product changes, new features, maintenance
+</Step>
+
+<Step>
+### Create File Structure
+Create your MDX file in the appropriate directory:
+
+<Files>
+  <Folder name="src/content">
+    <Folder name="docs">
+      <Folder name="getting-started">
+        <File name="quickstart.mdx" />
+      </Folder>
+    </Folder>
+    <Folder name="blog">
+      <File name="my-article.mdx" />
+    </Folder>
+    <Folder name="help">
+      <Folder name="(getting-started)">
+        <File name="first-steps.mdx" />
+        <File name="meta.json" />
+      </Folder>
+    </Folder>
+    <Folder name="updates">
+      <File name="new-feature.mdx" />
+    </Folder>
+  </Folder>
+</Files>
+</Step>
+
+<Step>
+### Add Frontmatter
+Include required metadata at the top of your file:
+
+```yaml
+---
+title: "My Article Title"
+description: "Brief description for SEO and previews"
+date: "2024-01-15T10:00:00.000Z"
+tags: ["tutorial", "getting-started"]
+---
+```
+</Step>
+
+<Step>
+### Write MDX Content
+Use Markdown with JSX components for rich formatting:
+
+```mdx
+# My Article Title
+
+This is regular markdown content.
+
+<Steps>
+<Step>
+### Step 1
+Do something important.
+</Step>
+<Step>
+### Step 2  
+Do the next thing.
+</Step>
+</Steps>
+
+<Banner type="info">
+Here's a helpful tip!
+</Banner>
+```
+</Step>
+
+<Step>
+### Configure Navigation (Optional)
+For help center categories, create `meta.json` files:
+
+```json
+{
+  "title": "Getting Started",
+  "description": "Initial setup guides",
+  "icon": "Rocket",
+  "pages": ["first-steps", "setup"],
+  "defaultOpen": true
+}
+```
+</Step>
+</Steps>
+
+## MDX Components
+
+Use these components to create interactive, professional content:
+
+<TypeTable
+  type={{
+    Steps: {
+      description: 'Numbered sequential steps',
+      type: 'Container for Step components',
+      default: 'Multiple steps',
+    },
+    Accordions: {
+      description: 'Collapsible content sections',
+      type: 'Container for Accordion components',
+      default: 'Multiple accordions',
+    },
+    Banner: {
+      description: 'Callout boxes for tips/warnings',
+      type: 'Banner with type="info|warning|error"',
+      default: 'Informational content',
+    },
+    TypeTable: {
+      description: 'Structured data tables',
+      type: 'Table with type definitions',
+      default: 'API documentation',
+    },
+    Files: {
+      description: 'File/directory tree visualization',
+      type: 'Container for File/Folder components',
+      default: 'Code structure display',
+    },
+    Tabs: {
+      description: 'Tabbed content sections',
+      type: 'Container for Tab components',
+      default: 'Alternative views',
+    },
+  }}
+/>
+
+## Navigation Structure
+
+### Documentation Navigation
+Docs use automatic navigation based on folder structure. Create nested folders for organization:
+
+```
+src/content/docs/
+├── getting-started/
+│   ├── quickstart.mdx
+│   └── environment-setup.mdx
+├── core-concepts/
+│   ├── authentication.mdx
+│   └── database.mdx
+└── api-reference/
+    ├── endpoints.mdx
+    └── schemas.mdx
+```
+
+### Help Center Categories
+Help uses explicit navigation with `meta.json` files for grouping:
+
+```
+src/content/help/
+├── (getting-started)/
+│   ├── meta.json          # Category definition
+│   └── first-steps.mdx
+├── (account-management)/
+│   ├── meta.json
+│   ├── profile.mdx
+│   └── security.mdx
+└── (faq)/
+    ├── meta.json
+    └── questions.mdx
+```
+
+### Meta.json Structure
+```json
+{
+  "title": "Category Name",
+  "description": "Category description",
+  "icon": "IconName",
+  "pages": ["page-slug-1", "page-slug-2"],
+  "defaultOpen": false
+}
+```
+
+## Practical Example
+
+Let's create a complete help article with navigation:
+
+<Steps>
+<Step>
+### Create Category Structure
+```bash
+mkdir -p src/content/help/\(troubleshooting\)
+```
+</Step>
+
+<Step>
+### Create meta.json
+```json
+// src/content/help/(troubleshooting)/meta.json
+{
+  "title": "Troubleshooting",
+  "description": "Solutions to common issues",
+  "icon": "HelpCircle",
+  "pages": ["common-issues", "error-codes"],
+  "defaultOpen": false
+}
+```
+</Step>
+
+<Step>
+### Create Article
+```mdx
+// src/content/help/(troubleshooting)/common-issues.mdx
+---
+title: "Common Issues & Solutions"
+description: "Fix the most frequently encountered problems"
+---
+
+# Common Issues & Solutions
+
+<Accordions type="multiple">
+<Accordion title="Login problems">
+Check your email for the verification link. If you don't see it, check your spam folder.
+</Accordion>
+
+<Accordion title="Slow loading">
+Clear your browser cache or try a different browser. Contact support if the issue persists.
+</Accordion>
+</Accordions>
+```
+</Step>
+</Steps>
+
+## SEO & Performance
+
+The content layer automatically optimizes for SEO:
+
+- **Meta tags**: Title and description from frontmatter
+- **Open Graph**: Automatic social media previews
+- **Structured data**: JSON-LD for rich snippets
+- **Performance**: Static generation with ISR
+- **Accessibility**: Semantic HTML and ARIA attributes
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Content not appearing">
+Check file extension (.mdx), frontmatter syntax, and restart dev server. Verify the file is in the correct directory.
+</Accordion>
+
+<Accordion title="Navigation not working">
+For help center, ensure meta.json has correct page slugs. For docs, check folder structure matches URL expectations.
+</Accordion>
+
+<Accordion title="Components not rendering">
+Verify component imports in mdx-components.tsx. Check for typos in component names and props.
+</Accordion>
+
+<Accordion title="Images not loading">
+Use absolute paths starting with /. Place images in public/ directory or use external URLs.
+</Accordion>
+
+<Accordion title="Build errors">
+Validate MDX syntax. Check for unclosed JSX tags, invalid frontmatter, or missing required fields.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Content organization">
+Use consistent naming conventions. Group related content in subdirectories. Keep URLs predictable.
+</Accordion>
+
+<Accordion title="Frontmatter consistency">
+Always include title and description. Use consistent date formats and tag naming.
+</Accordion>
+
+<Accordion title="Component usage">
+Choose components that enhance readability. Use Steps for procedures, Accordions for FAQs, Banners for important notes.
+</Accordion>
+
+<Accordion title="SEO optimization">
+Write descriptive titles and descriptions. Use relevant keywords naturally. Include alt text for images.
+</Accordion>
+
+<Accordion title="Maintenance">
+Regularly review and update content. Remove outdated information. Keep navigation structure clean.
+</Accordion>
+</Accordions>

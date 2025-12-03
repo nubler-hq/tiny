@@ -1,0 +1,104 @@
+---
+title: "Managing Your Profile"
+description: "Update your personal information, upload a profile photo, and manage your account details in the SaaS Boilerplate dashboard."
+---
+
+![Profile page showing personal information settings.](/images/help-center/account-management/03-profile-page.jpeg)
+
+## Introduction
+
+Your profile is your personal space in SaaS Boilerplate where you can manage your account details, upload a photo, and keep your information current. This ensures smooth communication and personalization across the platform. By the end of this guide, you'll know how to update all aspects of your profile.
+
+<Callout title="Tip">Keeping your profile updated helps with team collaboration and account security.</Callout>
+
+## Prerequisites
+
+- Access to the SaaS Boilerplate dashboard
+- A valid account with appropriate permissions
+- Basic familiarity with the dashboard navigation
+
+## Core Concepts
+
+### Profile Information
+Your profile includes personal details like name, email, and phone number. These are used for identification, notifications, and security verification.
+
+### Profile Photo
+A profile photo or avatar helps team members recognize you. The system automatically optimizes uploaded images for web use.
+
+## Step-by-Step Guide
+
+<Steps>
+<Step>
+### Access Your Profile
+Navigate to the profile settings by clicking **Settings** in the sidebar, then select **Account** > **My Profile**.
+</Step>
+
+<Step>
+### Update Profile Photo
+In the photo section at the top:
+- Click the upload button to select an image from your device.
+- The system will display your current photo or initials-based avatar.
+- Supported formats are automatically optimized.
+</Step>
+
+<Step>
+### Edit Personal Information
+Update the following fields as needed:
+
+<TypeTable
+  type={{
+    "Full Name": {
+      description: "Your display name used throughout the platform.",
+      type: "string",
+      default: "Your current name",
+    },
+    "Email": {
+      description: "Your account email (cannot be changed here for security reasons).",
+      type: "string (read-only)",
+      default: "Your registered email",
+    },
+    "Phone": {
+      description: "Phone number with country code for verification and support.",
+      type: "string",
+      default: "Empty or current number",
+    },
+  }}
+/>
+
+For the phone field, select your country code from the dropdown to ensure proper formatting.
+</Step>
+
+<Step>
+### Save Changes
+Review your updates, then click **Save Changes**. The system will confirm successful updates.
+</Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Photo upload fails">
+Ensure the file is an image format (JPG, PNG) and under the size limit. Try a different browser or clear cache.
+</Accordion>
+<Accordion title="Changes not saving">
+Check for validation errors (e.g., invalid phone format). Ensure all required fields are complete.
+</Accordion>
+<Accordion title="Email change needed">
+Contact support to update your email address, as it's restricted for security.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Use professional photos">
+Upload a clear, professional headshot for better team recognition.
+</Accordion>
+<Accordion title="Keep info current">
+Regularly update your contact details to ensure you receive important notifications.
+</Accordion>
+<Accordion title="Secure your account">
+Use a strong, unique password and enable two-factor authentication via Security settings.
+</Accordion>
+</Accordions>
+```

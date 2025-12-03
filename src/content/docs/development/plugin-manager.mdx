@@ -1,0 +1,380 @@
+---
+title: Plugin Manager
+description: Extend the platform with plugins (Slack, Discord, email, and more).
+---
+
+![Integrations Dashboard](/screenshots/screenshot-light-integrations.jpeg)
+
+By the end of this guide, you'll understand how to extend your SaaS platform with third-party integrations using the Plugin Manager. You'll learn to create plugins, register them, and trigger their actions from your application events, enabling seamless connections to services like Slack, Discord, and email providers.
+
+## Overview
+
+The Plugin Manager is a powerful system that simplifies delivering integrations to your users. By defining plugins with standardized schemas, you automatically get:
+
+- **Auto-generated UI**: Integration forms appear instantly in your dashboard without additional frontend work
+- **Type-safe Configuration**: Zod schemas ensure valid inputs and provide TypeScript support
+- **Organization Scoping**: Each organization configures integrations independently
+- **Event-driven Automation**: Trigger actions from domain events like lead creation or form submissions
+
+When you add a plugin, it immediately becomes available in the integrations dashboard at `/app/integrations`, where users can install, configure, and manage their third-party connections. This creates a seamless experience where new integrations enhance your platform's capabilities without requiring UI development.
+
+## Core Concepts
+
+### Plugins
+Self-contained modules that define integration logic with external services. Each plugin includes:
+- Configuration schema (Zod)
+- Metadata for UI display
+- Actions that can be triggered
+
+### Actions
+Functions a plugin can perform, like sending notifications or syncing data. Each action has:
+- Input schema for validation
+- Handler function with business logic
+
+### Integrations
+Organization-specific instances of plugins with stored configuration and enabled/disabled state.
+
+## Creating a Plugin
+
+<Steps>
+<Step>
+### Create Plugin Instance
+Define your plugin with schema, metadata, and actions.
+```typescript
+// src/plugins/my-service.plugin.ts
+import { PluginManager } from '@/@saas-boilerplate/providers/plugin-manager/provider'
+import { z } from 'zod'
+
+export const myService = PluginManager.plugin({
+  slug: 'my-service',
+  name: 'My Service',
+  schema: z.object({
+    apiKey: z.string().describe('API Key for My Service'),
+    apiSecret: z.string().describe('API Secret for My Service'),
+    webhookUrl: z.string().url().optional().describe('Optional webhook URL'),
+  }),
+  metadata: {
+    verified: false,
+    published: true,
+    description: 'Integrate with My Service for notifications and automation.',
+    category: 'notifications',
+    developer: 'Your Company',
+    website: 'https://my-service.com',
+    logo: 'https://my-service.com/logo.png',
+    links: {
+      docs: 'https://docs.my-service.com',
+      support: 'https://support.my-service.com',
+    },
+  },
+  actions: {
+    sendEvent: {
+      name: 'Send Event',
+      schema: z.object({
+        event: z.string(),
+        data: z.record(z.any()),
+      }),
+      handler: async ({ config, input }) => {
+        const response = await fetch('https://api.my-service.com/notify', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: `${input.event}: ${JSON.stringify(input.data)}`,
+          }),
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to send notification')
+        }
+        
+        return { success: true }
+      },
+    },
+  },
+})
+```
+
+<TypeTable
+  type={{
+    slug: {
+      description: 'Unique identifier for the plugin',
+      type: 'string',
+      default: 'Required',
+    },
+    name: {
+      description: 'Display name shown in the UI',
+      type: 'string',
+      default: 'Required',
+    },
+    schema: {
+      description: 'Zod schema defining configuration fields',
+      type: 'StandardSchemaV1',
+      default: 'Required',
+    },
+    metadata: {
+      description: 'UI and informational metadata',
+      type: 'object',
+      default: 'Required',
+    },
+    'metadata.verified': {
+      description: 'Whether the plugin is officially verified',
+      type: 'boolean',
+      default: 'false',
+    },
+    'metadata.published': {
+      description: 'Whether the plugin is available for installation',
+      type: 'boolean',
+      default: 'true',
+    },
+    'metadata.description': {
+      description: 'Brief description of the plugin',
+      type: 'string',
+      default: 'Required',
+    },
+    'metadata.category': {
+      description: 'Plugin category (notifications, automation, etc.)',
+      type: 'string',
+      default: 'Required',
+    },
+    'metadata.developer': {
+      description: 'Plugin developer or company name',
+      type: 'string',
+      default: 'Required',
+    },
+    'metadata.website': {
+      description: 'Plugin website URL',
+      type: 'string',
+      default: 'Required',
+    },
+    'metadata.logo': {
+      description: 'Plugin logo URL',
+      type: 'string',
+      default: 'Optional',
+    },
+    actions: {
+      description: 'Object containing plugin actions',
+      type: 'Record<string, PluginAction>',
+      default: 'Required',
+    },
+  }}
+/>
+</Step>
+
+<Step>
+### Register Plugin Instance
+Add the plugin to the PluginManager initialization.
+```typescript
+// src/services/plugin-manager.ts
+import { myService } from '../plugins/my-service.plugin'
+// ... other imports
+
+export const plugins = PluginManager.initialize({
+  plugins: {
+    slack,
+    discord,
+    telegram,
+    myService, // Add your new plugin here
+    // ... other plugins
+  },
+})
+```
+</Step>
+
+<Step>
+### Trigger Plugin Actions
+Create a complete controller that triggers your custom plugin action. Here's an example notification controller:
+
+```typescript
+// src/features/notification/controllers/notification.controller.ts
+import { igniter } from '@/igniter'
+import { AuthFeatureProcedure } from '@/@saas-boilerplate/features/auth/procedures/auth.procedure'
+import { IntegrationFeatureProcedure } from '@/@saas-boilerplate/features/integration/procedures/integration.procedure'
+import { z } from 'zod'
+
+export const NotificationController = igniter.controller({
+  name: 'Notification',
+  path: '/notifications',
+  actions: {
+    sendTest: igniter.mutation({
+      name: 'Send Test Notification',
+      description: 'Send a test notification using configured integrations.',
+      path: '/test',
+      method: 'POST',
+      use: [AuthFeatureProcedure(), IntegrationFeatureProcedure()],
+      body: z.object({
+        message: z.string(),
+      }),
+      handler: async ({ context, request, response }) => {
+        // Authentication: Get user session and organization
+        const session = await context.auth.getSession({
+          requirements: 'authenticated',
+          roles: ['admin', 'owner'],
+        })
+
+        if (!session?.organization) {
+          return response.unauthorized('Organization access required')
+        }
+
+        const organizationId = session.organization.id
+
+        // Business Logic: Setup plugins for the organization
+        const plugins = await context.integration.setupPluginsForOrganization(organizationId)
+
+        // Trigger the custom 'my-service' plugin action
+        const myServicePlugin = plugins['my-service']
+        if (myServicePlugin && 'sendEvent' in myServicePlugin) {
+          await myServicePlugin.sendEvent({
+            event: 'test.notification',
+            data: {
+              message: request.body.message,
+              organizationId,
+              timestamp: new Date().toISOString(),
+            },
+          })
+        }
+
+        // Response: Confirm notification sent
+        return response.success({ sent: true })
+      },
+    }),
+  },
+})
+```
+</Step>
+</Steps>
+
+## Managing Integrations
+
+The default SaaS Boilerplate provides a complete integrations dashboard at `/app/integrations` where users can install, configure, and manage plugins through a user-friendly interface. You typically won't need to manually call these endpoints unless you're building custom integration management features elsewhere in your application.
+
+<Accordions type="multiple">
+<Accordion title="findMany - List all integrations">
+Use this endpoint when you need to display available integrations in a custom UI or check installation status programmatically. It returns all plugins with their organization-specific state (installed/enabled/configured).
+
+```typescript
+// List all integrations for the organization
+const integrations = await context.integration.findMany.query()
+```
+</Accordion>
+
+<Accordion title="findOne - Get specific integration">
+Call this when you need details about a particular integration for an organization, such as checking if it's installed or getting its current configuration.
+
+```typescript
+// Get details of a specific integration
+const integration = await context.integration.findOne.query({ slug: 'my-service' })
+```
+</Accordion>
+
+<Accordion title="install - Install a plugin">
+Use this to programmatically install an integration for an organization with initial configuration. This is typically handled by the default integrations UI, but useful for automated setup or custom onboarding flows.
+
+```typescript
+// Install a plugin for an organization
+const integration = await context.integration.install.mutate({
+  slug: 'my-service',
+  metadata: {
+    apiKey: 'your-api-key',
+    apiSecret: 'your-api-secret',
+  },
+})
+```
+</Accordion>
+
+<Accordion title="update - Modify integration settings">
+Call this to update an integration's configuration or enable/disable it. Useful for custom settings pages or when you need to modify integration behavior based on user actions.
+
+```typescript
+// Update integration configuration
+await context.integration.update.mutate({
+  slug: 'my-service',
+  metadata: {
+    apiKey: 'new-api-key',
+    webhookUrl: 'https://example.com/webhook',
+  },
+  enabled: true,
+})
+```
+</Accordion>
+
+<Accordion title="uninstall - Remove integration">
+Use this to completely remove an integration from an organization. This cleans up all stored configuration and disables the integration.
+
+```typescript
+// Uninstall an integration
+await context.integration.uninstall.mutate({ slug: 'my-service' })
+```
+</Accordion>
+
+<Accordion title="setupPluginsForOrganization - Initialize plugins">
+This is the key method for triggering plugin actions. It loads all enabled integrations for an organization and returns configured plugin instances ready to use. Call this before triggering any plugin actions in your business logic.
+
+```typescript
+// Setup plugins for triggering actions
+const plugins = await context.integration.setupPluginsForOrganization(organizationId)
+
+// Trigger a plugin action
+const myServicePlugin = plugins['my-service']
+if (myServicePlugin && 'sendEvent' in myServicePlugin) {
+  await myServicePlugin.sendEvent({
+    event: 'user.created',
+    data: userData,
+  })
+}
+```
+</Accordion>
+</Accordions>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Plugin actions not triggering">
+Check that the integration is enabled for the organization and the plugin has the expected action method. Verify the plugin configuration is valid.
+</Accordion>
+
+<Accordion title="Schema validation errors">
+Ensure your Zod schemas match the expected input/output types. Use TypeScript to catch schema mismatches at compile time.
+</Accordion>
+
+<Accordion title="Plugin not appearing in UI">
+Verify the plugin is registered in `PluginManager.initialize` and has `metadata.published: true`. Check that the slug is unique.
+</Accordion>
+
+<Accordion title="Integration installation fails">
+Validate the configuration metadata against the plugin's schema. Ensure all required fields are provided and properly formatted.
+</Accordion>
+
+<Accordion title="Plugin handler errors">
+Wrap plugin actions in try-catch blocks and log errors. Use the `tryCatch` utility for consistent error handling.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Handle errors gracefully">
+Always wrap plugin actions in try-catch blocks. Log errors but don't let them break your main application flow.
+</Accordion>
+
+<Accordion title="Validate configurations">
+Use Zod schemas to validate plugin configurations. Provide clear error messages for invalid inputs.
+</Accordion>
+
+<Accordion title="Use descriptive metadata">
+Fill out all metadata fields to ensure plugins display correctly in the UI and provide good user experience.
+</Accordion>
+
+<Accordion title="Test plugin actions">
+Write unit tests for plugin handlers. Mock external API calls to ensure reliable testing.
+</Accordion>
+
+<Accordion title="Version plugin schemas">
+When updating plugin schemas, consider backward compatibility. Use optional fields for new requirements.
+</Accordion>
+
+<Accordion title="Secure sensitive data">
+Never log API keys or secrets. Use proper credential management for sensitive plugin configuration.
+</Accordion>
+</Accordions>

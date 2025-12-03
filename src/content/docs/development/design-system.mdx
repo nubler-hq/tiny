@@ -1,0 +1,995 @@
+---
+title: Design System
+description: Comprehensive design system with Tailwind CSS, shadcn UI components, theming, and accessibility patterns.
+---
+
+By the end of this guide, you'll have mastered the SaaS Boilerplate design system, enabling you to build consistent, accessible, and beautiful user interfaces with Tailwind CSS, shadcn UI components, and proper theming.
+
+## Overview
+
+The SaaS Boilerplate includes a comprehensive design system built on modern web standards, featuring Tailwind CSS for styling, shadcn UI for component primitives, Radix UI for accessibility, and a robust theming system. Key features include:
+
+- **Tailwind CSS**: Utility-first CSS framework with custom design tokens
+- **shadcn UI**: High-quality React components built on Radix UI primitives
+- **Design Tokens**: Consistent colors, typography, spacing, and shadows
+- **Dark Mode**: Complete dark/light theme support with system preference detection
+- **Accessibility**: WCAG-compliant components with proper ARIA attributes
+- **Responsive Design**: Mobile-first approach with breakpoint system
+- **Animation System**: Smooth transitions and micro-interactions
+- **Type Safety**: Full TypeScript support with proper component APIs
+- **Performance**: Optimized bundle size and runtime performance
+
+The system ensures design consistency across your application while providing flexibility for customization and extension.
+
+## Architecture
+
+### Tailwind CSS Foundation
+
+The design system is built on Tailwind CSS with custom configuration:
+
+```typescript
+// tailwind.config.ts - Custom design tokens
+const config: Config = {
+  theme: {
+    fontFamily: {
+      sans: ["geist"],
+      mono: ["geist-mono"],
+    },
+    extend: {
+      colors: {
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: "hsl(var(--primary))",
+        // ... extensive color system
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      // ... animations, shadows, spacing
+    }
+  }
+}
+```
+
+### shadcn UI Component Library
+
+Components are built using shadcn UI patterns with Radix UI primitives:
+
+```typescript
+// Component structure pattern
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, ...props }, ref) => {
+    return (
+      <button
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
+```
+
+### CSS Variables and Theming
+
+The system uses CSS custom properties for theming:
+
+```css
+/* src/app/globals.css */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  /* ... extensive color palette */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  /* ... dark mode overrides */
+}
+```
+
+## Setting Up the Design System
+
+<Steps>
+<Step>
+### Install Dependencies
+
+The design system dependencies are pre-installed. Key packages include:
+
+```json
+{
+  "dependencies": {
+    "tailwindcss": "^3.4.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.0.0",
+    "@radix-ui/react-slot": "^1.0.0",
+    "next-themes": "^0.2.0"
+  }
+}
+```
+</Step>
+
+<Step>
+### Configure Tailwind CSS
+
+The Tailwind configuration is already set up with custom design tokens:
+
+```typescript
+// tailwind.config.ts
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    "./node_modules/@tremor/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    // Custom configuration with design tokens
+  },
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@headlessui/tailwindcss"),
+    require("@tailwindcss/forms"),
+    require("@tailwindcss/typography"),
+  ],
+};
+```
+</Step>
+
+<Step>
+### Set Up Theme Provider
+
+The theme provider enables dark mode switching:
+
+```typescript
+// src/app/layout.tsx
+import { ThemeProvider } from '@/components/ui/theme-provider'
+
+export default function RootLayout({ children }) {
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      {children}
+    </ThemeProvider>
+  )
+}
+```
+</Step>
+
+<Step>
+### Import Global Styles
+
+Ensure global styles are imported:
+
+```typescript
+// src/app/layout.tsx
+import './globals.css'
+```
+</Step>
+</Steps>
+
+## Design Tokens
+
+### Color System
+
+The design system uses a comprehensive color palette with semantic naming:
+
+<TypeTable
+  type={{
+    background: {
+      description: 'Page background color',
+      type: 'CSS Variable',
+      default: 'oklch(1 0 0) / oklch(0.145 0 0) dark',
+    },
+    foreground: {
+      description: 'Primary text color',
+      type: 'CSS Variable',
+      default: 'oklch(0.145 0 0) / oklch(0.985 0 0) dark',
+    },
+    primary: {
+      description: 'Primary brand color',
+      type: 'CSS Variable',
+      default: 'oklch(0.205 0 0) / oklch(0.985 0 0) dark',
+    },
+    secondary: {
+      description: 'Secondary surface color',
+      type: 'CSS Variable',
+      default: 'oklch(0.97 0 0) / oklch(0.269 0 0) dark',
+    },
+    muted: {
+      description: 'Muted content color',
+      type: 'CSS Variable',
+      default: 'oklch(0.97 0 0) / oklch(0.269 0 0) dark',
+    },
+    accent: {
+      description: 'Accent color for interactions',
+      type: 'CSS Variable',
+      default: 'oklch(0.97 0 0) / oklch(0.269 0 0) dark',
+    },
+    destructive: {
+      description: 'Error/destructive color',
+      type: 'CSS Variable',
+      default: 'oklch(0.577 0.245 27.325)',
+    },
+  }}
+/>
+
+### Typography Scale
+
+Typography follows a consistent scale with Geist font family:
+
+<TypeTable
+  type={{
+    'text-xs': {
+      description: 'Extra small text',
+      type: 'Tailwind Class',
+      default: '0.75rem (12px) / 1rem',
+    },
+    'text-sm': {
+      description: 'Small text',
+      type: 'Tailwind Class',
+      default: '0.875rem (14px) / 1.25rem',
+    },
+    'text-base': {
+      description: 'Base text size',
+      type: 'Tailwind Class',
+      default: '1rem (16px) / 1.5rem',
+    },
+    'text-lg': {
+      description: 'Large text',
+      type: 'Tailwind Class',
+      default: '1.125rem (18px) / 1.75rem',
+    },
+    'text-xl': {
+      description: 'Extra large text',
+      type: 'Tailwind Class',
+      default: '1.25rem (20px) / 1.75rem',
+    },
+    'text-2xl': {
+      description: '2x large text',
+      type: 'Tailwind Class',
+      default: '1.5rem (24px) / 2rem',
+    },
+    'text-3xl': {
+      description: '3x large text',
+      type: 'Tailwind Class',
+      default: '1.875rem (30px) / 2.25rem',
+    },
+    'text-4xl': {
+      description: '4x large text',
+      type: 'Tailwind Class',
+      default: '2.25rem (36px) / 2.5rem',
+    },
+  }}
+/>
+
+### Spacing Scale
+
+Consistent spacing using a rem-based scale:
+
+<TypeTable
+  type={{
+    'space-1': {
+      description: '4px spacing',
+      type: 'Tailwind Class',
+      default: '0.25rem',
+    },
+    'space-2': {
+      description: '8px spacing',
+      type: 'Tailwind Class',
+      default: '0.5rem',
+    },
+    'space-3': {
+      description: '12px spacing',
+      type: 'Tailwind Class',
+      default: '0.75rem',
+    },
+    'space-4': {
+      description: '16px spacing',
+      type: 'Tailwind Class',
+      default: '1rem',
+    },
+    'space-6': {
+      description: '24px spacing',
+      type: 'Tailwind Class',
+      default: '1.5rem',
+    },
+    'space-8': {
+      description: '32px spacing',
+      type: 'Tailwind Class',
+      default: '2rem',
+    },
+    'space-12': {
+      description: '48px spacing',
+      type: 'Tailwind Class',
+      default: '3rem',
+    },
+    'space-16': {
+      description: '64px spacing',
+      type: 'Tailwind Class',
+      default: '4rem',
+    },
+  }}
+/>
+
+## Component Patterns
+
+### Button Variants
+
+The Button component supports multiple variants and sizes:
+
+```typescript
+// Available variants
+type ButtonVariant = 
+  | "default" 
+  | "destructive" 
+  | "outline" 
+  | "secondary" 
+  | "ghost" 
+  | "link"
+
+type ButtonSize = "default" | "sm" | "lg" | "icon"
+
+// Usage
+<Button variant="default" size="sm">Click me</Button>
+<Button variant="outline" size="lg">Outline</Button>
+<Button variant="ghost">Ghost</Button>
+```
+
+### Form Components
+
+Form components follow consistent patterns with proper validation:
+
+```typescript
+// Form structure
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(onSubmit)}>
+    <FormField
+      control={form.control}
+      name="email"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Email</FormLabel>
+          <FormControl>
+            <Input placeholder="Enter email" {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <Button type="submit">Submit</Button>
+  </form>
+</Form>
+```
+
+### Layout Components
+
+Layout components provide consistent spacing and structure:
+
+```typescript
+// Page layout pattern
+<PageWrapper>
+  <PageHeader>
+    <PageMainBar>
+      <Breadcrumb />
+    </PageMainBar>
+    <PageActionsBar>
+      <Button>Create</Button>
+    </PageActionsBar>
+  </PageHeader>
+  <PageBody>
+    <div className="container max-w-(--breakpoint-md)">
+      {/* Page content */}
+    </div>
+  </PageBody>
+</PageWrapper>
+```
+
+## Theming and Dark Mode
+
+### Theme Provider Setup
+
+The theme provider manages light/dark mode switching:
+
+```typescript
+// src/components/ui/theme-provider.tsx
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+}
+
+// Usage in layout
+<ThemeProvider
+  attribute="class"
+  defaultTheme="system"
+  enableSystem
+  disableTransitionOnChange
+>
+  {children}
+</ThemeProvider>
+```
+
+### Theme Toggle Component
+
+Theme switching component with system preference detection:
+
+```typescript
+// src/components/ui/theme-toggle.tsx
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+    >
+      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+    </Button>
+  )
+}
+```
+
+### CSS Variable Updates
+
+Dynamic theme color updates for mobile browsers:
+
+```typescript
+// Theme color script in theme provider
+const THEME_COLOR_SCRIPT = `
+(function() {
+  var html = document.documentElement;
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  function updateThemeColor() {
+    var isDark = html.classList.contains('dark');
+    meta.setAttribute('content', isDark ? DARK_THEME_COLOR : LIGHT_THEME_COLOR);
+  }
+  var observer = new MutationObserver(updateThemeColor);
+  observer.observe(html, { attributes: true, attributeFilter: ['class'] });
+  updateThemeColor();
+})();
+`
+```
+
+## Practical Examples
+
+### Building a Dashboard Card
+
+Complete dashboard card with proper styling and theming:
+
+```typescript
+function DashboardCard({ 
+  title, 
+  value, 
+  change, 
+  icon: Icon 
+}: DashboardCardProps) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground">
+          {change > 0 ? '+' : ''}{change}% from last month
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Usage
+<DashboardCard
+  title="Total Revenue"
+  value="$45,231.89"
+  change={20.1}
+  icon={DollarSign}
+/>
+```
+
+### Form with Validation
+
+Complete form implementation with validation and error handling:
+
+```typescript
+function UserProfileForm() {
+  const form = useFormWithZod({
+    schema: userProfileSchema,
+    defaultValues: {
+      name: '',
+      email: '',
+      bio: '',
+    },
+  })
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.onSubmit} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Full Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John Doe" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is your public display name.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input type="email" placeholder="john@example.com" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="bio"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Bio</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Tell us about yourself..."
+                  className="resize-none"
+                  {...field}
+                />
+              </FormControl>
+              <FormDescription>
+                You can write up to 500 characters.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </form>
+    </Form>
+  )
+}
+```
+
+### Data Table with Actions
+
+Advanced data table with sorting, filtering, and actions:
+
+```typescript
+function UsersTable({ users }: { users: User[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Users</h2>
+          <p className="text-muted-foreground">
+            Manage your team members and their permissions.
+          </p>
+        </div>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Add User
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Team Members</CardTitle>
+          <CardDescription>
+            A list of all users in your organization.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                      {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
+                      {user.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>Edit</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+```
+
+## Accessibility Features
+
+### ARIA Attributes
+
+Components include proper ARIA attributes for screen readers:
+
+```typescript
+// Button with accessibility
+<Button 
+  aria-label="Close dialog"
+  aria-expanded={isOpen}
+  onClick={handleClick}
+>
+  <X className="h-4 w-4" />
+</Button>
+
+// Form with proper labeling
+<FormField
+  control={form.control}
+  name="email"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel htmlFor="email">Email Address</FormLabel>
+      <FormControl>
+        <Input 
+          id="email"
+          type="email" 
+          aria-describedby="email-error"
+          {...field} 
+        />
+      </FormControl>
+      <FormMessage id="email-error" />
+    </FormItem>
+  )}
+/>
+```
+
+### Focus Management
+
+Proper focus indicators and keyboard navigation:
+
+```typescript
+// Focus ring styles in globals.css
+.focus-visible\:ring-2:focus-visible {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+// Component with focus management
+<Dialog>
+  <DialogTrigger asChild>
+    <Button>Open Dialog</Button>
+  </DialogTrigger>
+  <DialogContent>
+    {/* Dialog content with proper focus management */}
+  </DialogContent>
+</Dialog>
+```
+
+### Color Contrast
+
+Design tokens ensure proper contrast ratios:
+
+```typescript
+// Color contrast validation
+const colors = {
+  background: 'oklch(1 0 0)',      // Light background
+  foreground: 'oklch(0.145 0 0)',  // Dark text - high contrast
+  
+  // Dark mode
+  darkBackground: 'oklch(0.145 0 0)', // Dark background  
+  darkForeground: 'oklch(0.985 0 0)', // Light text - high contrast
+}
+```
+
+## Animation System
+
+### CSS Transitions
+
+Smooth transitions for interactive elements:
+
+```typescript
+// Button hover transitions
+const buttonVariants = cva(
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  // ... variants
+)
+
+// Custom animations in tailwind.config.ts
+keyframes: {
+  "accordion-down": {
+    from: { height: "0" },
+    to: { height: "var(--radix-accordion-content-height)" },
+  },
+  "accordion-up": {
+    from: { height: "var(--radix-accordion-content-height)" },
+    to: { height: "0" },
+  },
+  // ... more animations
+}
+```
+
+### Framer Motion Integration
+
+Advanced animations using Framer Motion:
+
+```typescript
+import { motion } from 'framer-motion'
+
+function AnimatedCard({ children, delay = 0 }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ 
+        duration: 0.3, 
+        delay,
+        ease: 'easeOut' 
+      }}
+    >
+      <Card>{children}</Card>
+    </motion.div>
+  )
+}
+
+// Usage
+<AnimatePresence>
+  {items.map((item, index) => (
+    <AnimatedCard key={item.id} delay={index * 0.1}>
+      {item.content}
+    </AnimatedCard>
+  ))}
+</AnimatePresence>
+```
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Components not styling correctly">
+Ensure Tailwind CSS is properly configured and the content paths include your component files. Check that the `cn` utility function is imported and used correctly for class merging.
+</Accordion>
+
+<Accordion title="Dark mode not working">
+Verify that the ThemeProvider is wrapping your app and that components use CSS variables instead of hardcoded colors. Check that the `dark:` prefix is used in Tailwind classes.
+</Accordion>
+
+<Accordion title="TypeScript errors with component props">
+Ensure you're extending the correct interfaces from Radix UI and including all required props. Use the `VariantProps` type from `class-variance-authority` for variant types.
+</Accordion>
+
+<Accordion title="Animations not working">
+Check that `tailwindcss-animate` plugin is installed and included in the Tailwind config. Ensure animation classes are properly defined in the keyframes section.
+</Accordion>
+
+<Accordion title="Accessibility warnings">
+Run accessibility audits and ensure all interactive elements have proper ARIA attributes. Use Radix UI primitives which include built-in accessibility features.
+</Accordion>
+
+<Accordion title="Bundle size concerns">
+Use dynamic imports for heavy components and ensure tree shaking is working. Monitor bundle size with build tools and optimize component imports.
+</Accordion>
+
+<Accordion title="Responsive design issues">
+Test components at different breakpoints. Use Tailwind's responsive prefixes (`sm:`, `md:`, `lg:`) and ensure mobile-first approach. Check container queries if needed.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Use design tokens consistently">
+Always use CSS custom properties and Tailwind design tokens instead of hardcoded values. This ensures consistency and easy theme updates.
+</Accordion>
+
+<Accordion title="Follow component composition patterns">
+Build complex UIs by composing smaller, reusable components. Prefer composition over inheritance for flexibility.
+</Accordion>
+
+<Accordion title="Implement proper TypeScript types">
+Use strict TypeScript types for all component props. Leverage `VariantProps` for styling variants and ensure proper generic constraints.
+</Accordion>
+
+<Accordion title="Prioritize accessibility">
+Include proper ARIA attributes, keyboard navigation, and screen reader support. Use Radix UI primitives for built-in accessibility.
+</Accordion>
+
+<Accordion title="Optimize for performance">
+Use React.memo for expensive components, implement proper key props for lists, and avoid unnecessary re-renders. Monitor bundle size.
+</Accordion>
+
+<Accordion title="Maintain design consistency">
+Follow the established design patterns and spacing scales. Use the predefined color palette and typography system consistently.
+</Accordion>
+
+<Accordion title="Test across themes and devices">
+Test components in both light and dark modes. Ensure responsive behavior across different screen sizes and devices.
+</Accordion>
+
+<Accordion title="Document component APIs">
+Provide clear TypeScript interfaces and JSDoc comments for all components. Include usage examples and prop descriptions.
+</Accordion>
+
+<Accordion title="Use semantic HTML">
+Choose appropriate HTML elements for their semantic meaning. Use heading hierarchy properly and include proper landmarks.
+</Accordion>
+
+<Accordion title="Handle loading and error states">
+Always provide loading skeletons and error states for async operations. Use consistent loading patterns across the application.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Forms and Validation](../development/forms-and-validation) - Form handling patterns
+- [SEO](../core-concepts/seo) - Design system impact on SEO
+- [Performance and Security](../../architecture/performance-and-security) - Design system performance considerations
+- [Routing and Navigation](../development/routing-and-navigation) - Navigation patterns
+- [Styling and UI](../development/styling-and-ui) - Advanced styling techniques
+
+## API Reference
+
+### Component Variants
+
+<TypeTable
+  type={{
+    Button: {
+      description: 'Primary interactive component',
+      variants: 'default, destructive, outline, secondary, ghost, link',
+      sizes: 'sm, default, lg, icon',
+    },
+    Input: {
+      description: 'Text input component',
+      variants: 'default',
+      sizes: 'default',
+    },
+    Card: {
+      description: 'Content container component',
+      variants: 'default',
+      sizes: 'default',
+    },
+    Badge: {
+      description: 'Status and label component',
+      variants: 'default, secondary, destructive, outline',
+      sizes: 'default, sm',
+    },
+    Alert: {
+      description: 'Notification and feedback component',
+      variants: 'default, destructive',
+      sizes: 'default',
+    },
+  }}
+/>
+
+### Utility Functions
+
+<TypeTable
+  type={{
+    'cn(...classes)': {
+      description: 'Merge and deduplicate CSS classes',
+      type: 'string',
+      default: 'clsx + tailwind-merge',
+    },
+    'cva(options)': {
+      description: 'Create component variants',
+      type: 'VariantFunction',
+      default: 'class-variance-authority',
+    },
+    'useTheme()': {
+      description: 'Access current theme state',
+      type: 'ThemeHook',
+      default: 'next-themes',
+    },
+  }}
+/>
+
+### CSS Custom Properties
+
+<TypeTable
+  type={{
+    '--background': {
+      description: 'Background color',
+      type: 'CSS Variable',
+      default: 'oklch color value',
+    },
+    '--foreground': {
+      description: 'Text color',
+      type: 'CSS Variable',
+      default: 'oklch color value',
+    },
+    '--primary': {
+      description: 'Primary brand color',
+      type: 'CSS Variable',
+      default: 'oklch color value',
+    },
+    '--radius': {
+      description: 'Border radius base value',
+      type: 'CSS Variable',
+      default: '0.625rem',
+    },
+  }}
+/>
+
+### Animation Classes
+
+<TypeTable
+  type={{
+    'animate-fadeIn': {
+      description: 'Fade in animation',
+      type: 'Tailwind Class',
+      default: 'opacity 0 → 1',
+    },
+    'animate-slideUp': {
+      description: 'Slide up animation',
+      type: 'Tailwind Class',
+      default: 'translateY 20px → 0',
+    },
+    'animate-pulse': {
+      description: 'Pulse animation',
+      type: 'Tailwind Class',
+      default: 'opacity oscillation',
+    },
+    'animate-accordion-down': {
+      description: 'Accordion expand animation',
+      type: 'Tailwind Class',
+      default: 'height 0 → auto',
+    },
+  }}
+/>

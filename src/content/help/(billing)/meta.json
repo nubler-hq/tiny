@@ -1,0 +1,9 @@
+{
+  "title": "Billing",
+  "description": "Guide for managing billing, payments, and your account's financial history.",
+  "icon": "CreditCard",
+  "pages": [
+    "managing-billing"
+  ],
+  "defaultOpen": true
+}

@@ -1,0 +1,24 @@
+// rulesync.jsonc
+{
+  // List of tools to generate configurations for. You can specify "*" to generate all tools.
+  "targets": ["cursor", "claudecode", "geminicli", "opencode", "codexcli"],
+
+  // Features to generate. You can specify "*" to generate all features.
+  "features": ["*"],
+  
+  // Base directories for generation.
+  // Basically, you can specify a `["."]` only.
+  // However, for example, if your project is a monorepo and you have to launch the AI agent at each package directory, you can specify multiple base directories.
+  "baseDirs": ["."],
+  
+  // Delete existing files before generating
+  "delete": true,
+
+  // Verbose output
+  "verbose": false,
+
+  // Experimental features
+  "experimentalGlobal": false,
+  "experimentalSimulateCommands": true,
+  "experimentalSimulateSubagents": true
+}

@@ -1,0 +1,11 @@
+{
+  "title": "Updates",
+  "description": "Latest features and improvements in SaaS Boilerplate.",
+  "pages": [
+    "mcp-server-launch",
+    "notifications-system-launch",
+    "integrations-system-launch",
+    "api-keys-system-launch",
+    "webhooks-system-launch"
+  ]
+}

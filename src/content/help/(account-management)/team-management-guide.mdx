@@ -1,0 +1,110 @@
+---
+title: "Team Management Guide"
+description: "Learn how to invite, manage, and organize your team members in SaaS Boilerplate, including roles, permissions, and best practices for collaboration."
+---
+
+![Organization Members page where you can see current members and invite new ones.](/images/help-center/account-management/02-organization-members.jpeg)
+
+## Introduction
+
+Effective team management is crucial for scaling your organization in SaaS Boilerplate. This guide covers inviting members, assigning roles, and maintaining a productive collaborative environment. By the end, you'll have a well-structured team with clear permissions and responsibilities.
+
+<Callout title="Tip">Clear roles and communication help teams collaborate more effectively and securely.</Callout>
+
+## Prerequisites
+
+- Owner or Admin access to the organization
+- Understanding of your team's needs and responsibilities
+- Access to the dashboard settings
+
+## Core Concepts
+
+### Team Roles
+SaaS Boilerplate uses a hierarchical role system: Owner, Admin, and Member, each with specific permissions.
+
+### Permissions
+Roles determine what actions users can perform, from basic access to full administrative control.
+
+### Invitations
+New members receive email invitations with setup instructions and role assignments.
+
+## Step-by-Step Guide
+
+<Steps>
+<Step>
+### Access Team Management
+Navigate to Settings > Organization > Members in the dashboard.
+</Step>
+
+<Step>
+### Invite a New Member
+Click "Invite Member" and enter:
+- Email address
+- Role (Owner, Admin, or Member)
+- Optional welcome message
+</Step>
+
+<Step>
+### Send Invitation
+Click "Send Invitation". The member will receive an email with login instructions.
+</Step>
+
+<Step>
+### Manage Existing Members
+View the member list, change roles via dropdown, or remove members as needed.
+</Step>
+</Steps>
+
+## Role Details
+
+<TypeTable
+  type={{
+    Owner: {
+      description: 'Full control over organization, billing, and members. Only one per organization.',
+      permissions: 'All administrative actions',
+    },
+    Admin: {
+      description: 'Manage members, settings, and projects. Trusted lieutenant role.',
+      permissions: 'Member management, organization config, full tool access',
+    },
+    Member: {
+      description: 'Access tools and collaborate on projects. Core contributor role.',
+      permissions: 'Tool access, content creation, limited management',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Invitation not received">
+Check spam folder or resend invitation. Verify email address is correct.
+</Accordion>
+<Accordion title="Member can't access features">
+Review their role permissions. Promote if needed or adjust settings.
+</Accordion>
+<Accordion title="Can't remove Owner">
+Contact support to transfer ownership before removal.
+</Accordion>
+<Accordion title="Role changes not applying">
+Refresh the page or check for confirmation. Changes are usually immediate.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Assign roles carefully">
+Start with Member role and promote based on responsibilities and trust.
+</Accordion>
+<Accordion title="Communicate expectations">
+Explain roles and permissions during onboarding to avoid confusion.
+</Accordion>
+<Accordion title="Regular audits">
+Review team access quarterly and adjust as team structure evolves.
+</Accordion>
+<Accordion title="Remove access promptly">
+Revoke permissions immediately when team members leave.
+</Accordion>
+</Accordions>
+```

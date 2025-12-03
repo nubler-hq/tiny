@@ -1,0 +1,9 @@
+{
+  "title": "Webhooks",
+  "description": "Automate integrations and notifications using webhooks.",
+  "icon": "WebhookIcon",
+  "pages": [
+    "managing-webhooks"
+  ],
+  "defaultOpen": true
+}

@@ -1,0 +1,362 @@
+---
+title: Organizations & Tenancy
+description: Understand multi-tenant isolation, membership roles, and how the active org shapes access control.
+---
+
+Welcome to the Organizations & Tenancy guide! If you're building a SaaS application, multi-tenancy is crucial for scaling and isolating customer data. This guide will walk you through how the SaaS Boilerplate implements organizations as the core tenant model, ensuring secure data isolation while allowing users to belong to multiple organizations. We'll cover the data model, roles, API scoping, and practical examples to help you understand and extend this system.
+
+## Why Multi-Tenancy Matters
+
+In a SaaS application, multi-tenancy means serving multiple customers (tenants) from a single codebase and database, while keeping their data completely separate. Organizations in the SaaS Boilerplate represent these tenants—each company or team gets its own isolated workspace.
+
+Key benefits:
+- **Scalability**: One app serves many customers without code duplication.
+- **Security**: Data is strictly isolated; users can't access data from other organizations.
+- **Flexibility**: Users can belong to multiple organizations (e.g., personal and work accounts).
+
+Without proper tenancy, you'd risk data leaks or complex workarounds. The boilerplate uses organization-scoped queries and session-based access control to enforce isolation.
+
+## How Organizations Work
+
+### User Membership and Active Organization
+
+A user can join multiple organizations through memberships. Each membership has a role (owner, admin, member) that determines permissions.
+
+The "active organization" is stored in the user's session. This shapes what data they see and what actions they can perform. For example:
+- When viewing leads, only those from the active organization appear.
+- API calls automatically filter by the active organization's ID.
+
+If a user isn't in any organization, they're prompted to create or join one during onboarding.
+
+### Data Isolation
+
+All business data (leads, submissions, webhooks, etc.) belongs to an organization. Database queries always include `organizationId` filters. This ensures:
+- Users only see their organization's data.
+- Admins can't accidentally access other tenants' info.
+- API keys and integrations are organization-specific.
+
+## Data Model Overview
+
+The organization system revolves around these core entities. Let's break down the key models from `prisma/schema.prisma`:
+
+<TypeTable
+  type={{
+    Organization: {
+      description: 'The root tenant entity. Contains metadata, settings, and relationships to all organization-scoped data.',
+      type: 'Model',
+    },
+    Member: {
+      description: 'Links users to organizations with roles. Enables multi-org membership and permission control.',
+      type: 'Model',
+    },
+    Invitation: {
+      description: 'Handles pending organization invites. Tracks status, expiration, and inviter details.',
+      type: 'Model',
+    },
+    ApiKey: {
+      description: 'Organization-scoped API credentials for external integrations.',
+      type: 'Model',
+    },
+    Webhook: {
+      description: 'Outgoing webhooks for real-time notifications to external services.',
+      type: 'Model',
+    },
+    Integration: {
+      description: 'Third-party integrations (e.g., Slack, email providers) tied to the organization.',
+      type: 'Model',
+    },
+    Customer: {
+      description: 'Billing customer data linked to the organization for subscriptions.',
+      type: 'Model',
+    },
+    Lead: {
+      description: 'Potential customers captured by the organization (example feature).',
+      type: 'Model',
+    },
+    Submission: {
+      description: 'Form submissions or data entries associated with leads (example feature).',
+      type: 'Model',
+    },
+    Notification: {
+      description: 'In-app notifications for users within the organization.',
+      type: 'Model',
+    },
+  }}
+/>
+
+### Organization Model Details
+
+The `Organization` model is the heart of tenancy:
+
+<TypeTable
+  type={{
+    id: {
+      description: 'Unique identifier (UUID).',
+      type: 'string',
+    },
+    name: {
+      description: 'Display name (e.g., "Acme Corp").',
+      type: 'string',
+    },
+    slug: {
+      description: 'URL-friendly identifier (e.g., "acme-corp") for public profiles.',
+      type: 'string',
+    },
+    logo: {
+      description: 'Optional logo URL.',
+      type: 'string?',
+    },
+    metadata: {
+      description: 'Flexible JSON for custom fields (e.g., contact info, settings).',
+      type: 'Json?',
+    },
+    Relationships: {
+      description: 'Links to members, invitations, API keys, webhooks, integrations, leads (example feature), submissions (example feature), notifications, and billing customer.',
+      type: 'various',
+    },
+  }}
+/>
+
+### Member Model Details
+
+Members connect users to organizations:
+
+<TypeTable
+  type={{
+    id: {
+      description: 'Unique membership ID.',
+      type: 'string',
+    },
+    organizationId: {
+      description: 'Foreign key to the organization.',
+      type: 'string',
+    },
+    userId: {
+      description: 'Foreign key to the user.',
+      type: 'string',
+    },
+    role: {
+      description: 'Permission level ("owner", "admin", "member").',
+      type: 'string',
+    },
+    teamId: {
+      description: 'Optional for sub-teams (future feature).',
+      type: 'string?',
+    },
+    Unique_constraint: {
+      description: 'One membership per user-organization pair.',
+      type: 'constraint',
+    },
+  }}
+/>
+
+### Invitation Model Details
+
+For inviting new members:
+
+<TypeTable
+  type={{
+    id: {
+      description: 'Unique invite ID.',
+      type: 'string',
+    },
+    organizationId: {
+      description: 'Target organization.',
+      type: 'string',
+    },
+    email: {
+      description: 'Invitee email.',
+      type: 'string',
+    },
+    role: {
+      description: 'Proposed role.',
+      type: 'string?',
+    },
+    status: {
+      description: '"pending", "accepted", "rejected", "expired".',
+      type: 'string',
+    },
+    expiresAt: {
+      description: 'Expiration timestamp.',
+      type: 'DateTime',
+    },
+    inviterId: {
+      description: 'User who sent the invite.',
+      type: 'string',
+    },
+  }}
+/>
+
+## Roles and Permissions
+
+Roles control what users can do within an organization. The boilerplate uses a simple hierarchy:
+
+<TypeTable
+  type={{
+    owner: {
+      description: 'Full access: create/update/delete organization, manage members, billing, all resources.',
+      type: 'Role',
+    },
+    admin: {
+      description: 'Most access: manage resources, members, integrations; cannot delete organization or change billing.',
+      type: 'Role',
+    },
+    member: {
+      description: 'Basic access: view and edit resources; cannot manage organization settings or members.',
+      type: 'Role',
+    },
+  }}
+/>
+
+### Implementing Role Checks
+
+Permissions are enforced in procedures (server-side functions). For example:
+
+```typescript
+// In a procedure
+const session = await context.auth.getSession({
+  requirements: 'authenticated',
+  roles: ['admin', 'owner'], // Require specific roles
+});
+
+// Only admins/owners can proceed
+```
+
+Guidelines for roles:
+- **Least privilege**: Default to "member" for new users.
+- **Explicit checks**: Always verify roles for sensitive operations.
+- **Avoid sprawl**: Keep roles simple; use metadata for fine-grained permissions if needed.
+
+## API Scoping and Controllers
+
+All API endpoints respect organization boundaries. Controllers read the active organization from the session and filter queries accordingly.
+
+### Example: Creating an Organization
+
+<Steps>
+<Step>
+
+### Set Up the Controller
+
+The `OrganizationController` handles org lifecycle. It uses procedures for auth and notifications.
+
+```typescript
+export const OrganizationController = igniter.controller({
+  name: 'Organization',
+  path: '/organization',
+  actions: {
+    create: igniter.mutation({
+      // ... config
+      handler: async ({ request, response, context }) => {
+        const session = await context.auth.getSession({ requirements: 'authenticated' });
+        // Create org and set as active
+        const org = await context.organization.create({
+          name: request.body.name,
+          slug: request.body.slug,
+          userId: session.user.id,
+        });
+        return response.created(org);
+      },
+    }),
+    // ... other actions
+  },
+});
+```
+
+</Step>
+
+<Step>
+
+### Filter by Organization
+
+In queries, always include `organizationId`:
+
+```typescript
+// Get leads for active org
+const leads = await context.lead.list({
+  organizationId: session.organization.id,
+});
+```
+
+</Step>
+
+<Step>
+
+### Validate Membership
+
+Before actions, ensure the user belongs to the org:
+
+```typescript
+if (!session.organization) {
+  return response.forbidden('No active organization');
+}
+```
+
+</Step>
+</Steps>
+
+### Key Endpoints
+
+From the OpenAPI spec:
+- `POST /organization`: Create new org.
+- `GET /organization/stats`: Get org analytics.
+- `PUT /organization`: Update org details.
+- `POST /invitation`: Invite members.
+- `GET /membership`: List org members.
+
+All require authentication and active organization.
+
+## Practical Examples
+
+### Onboarding a New User
+
+1. User signs up → No organization yet.
+2. Prompt to create org: `POST /organization` with name/slug.
+3. Auto-set as active org in session.
+4. User can now add members, resources.
+
+### Switching Organizations
+
+1. User has multiple memberships.
+2. Call `POST /auth/set-active-organization` with org ID.
+3. Session updates; UI refreshes with new org's data.
+
+### Inviting Members
+
+1. Admin calls `POST /invitation` with email/role.
+2. Invitee receives email with accept link.
+3. On accept: `POST /invitation/:id/accept` → Creates membership.
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="User can't access organization data">
+Ensure the user has an active organization in their session. Check `session.organization` is set. If not, redirect to org creation/join flow.
+</Accordion>
+<Accordion title="Role checks failing">
+Verify the role is correctly stored in the `Member` model. Use the correct role names ('owner', 'admin', 'member'). Debug with session inspection.
+</Accordion>
+<Accordion title="Data leaking between organizations">
+All queries must filter by `organizationId`. Double-check controllers for missing filters. Use database constraints to prevent cross-org access.
+</Accordion>
+<Accordion title="Invitation not working">
+Check `expiresAt` hasn't passed. Ensure email service is configured. Verify invite status in the database.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Consistent scoping">
+Always derive `organizationId` from session, never from user input.
+</Accordion>
+<Accordion title="Onboarding flow">
+Guide new users to create/join orgs immediately.
+</Accordion>
+<Accordion title="Audit logging">
+Track org changes for compliance.
+</Accordion>
+<Accordion title="Testing">
+Use multi-org test data to verify isolation.
+</Accordion>
+</Accordions>

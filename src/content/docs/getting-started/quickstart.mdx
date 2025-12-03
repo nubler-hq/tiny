@@ -1,0 +1,218 @@
+---
+title: Quickstart
+description: Get started with the SaaS Boilerplate by installing it via CLI or manually, then setting up your local development environment.
+---
+
+Welcome to the SaaS Boilerplate! This guide will walk you through getting the project up and running on your local machine. Whether you're new to the project or looking to contribute, we'll cover two installation methods: using our CLI tool for a streamlined setup, or manually cloning the repository for more control. By the end, you'll have a fully functional application with a database, authentication, and built-in documentation.
+
+## Before You Begin
+
+Ensure you have the following installed on your system:
+
+- **Node.js 22+**: Required for running the application and its dependencies.
+- **Docker Desktop**: Needed to run PostgreSQL locally for the database.
+- **Stripe Account** (optional): Only if you plan to test billing and payment flows.
+
+## Installation
+
+Choose your preferred method to get the SaaS Boilerplate code on your machine. The CLI method is recommended for new projects as it automates much of the initial setup.
+
+<Tabs items={["CLI (Recommended)", "Manual"]} defaultIndex={0}>
+<Tab>
+
+The CLI tool simplifies the process by creating a new project directory, installing dependencies, and setting up initial configuration files.
+
+<Steps>
+
+<Step>
+
+### Create a new project
+
+Run the following command in your terminal:
+
+```bash
+npx saas-boilerplate@latest create my-saas-app
+```
+
+Replace `my-saas-app` with your desired project name. This command will guide you through an interactive setup process.
+
+</Step>
+
+<Step>
+
+### Follow the CLI prompts
+
+The CLI will ask you a series of questions to configure your project:
+
+```txt filename="Terminal"
+What is the name of your project? (Required)? my-app
+Choose GitHub authentication method (HTTPS or SSH)? https, ssh
+Choose your preferred package manager? npm, yarn, pnpm, bun
+Do you want to configure Stripe for payments now? No / Yes
+Configure Code Agents (LIA) now? No / Yes
+Start the development server now? No / Yes
+```
+
+</Step>
+
+<Step>
+
+### Navigate to your project
+
+```bash
+cd my-saas-app
+```
+
+Your project is now ready for the setup steps below.
+
+</Step>
+
+</Steps>
+
+</Tab>
+<Tab>
+
+If you prefer more control or want to contribute to the boilerplate itself, clone the repository directly.
+
+<Steps>
+
+<Step>
+
+### Clone the repository
+
+```bash
+git clone https://github.com/felipebarcelospro/saas-boilerplate
+cd saas-boilerplate
+```
+
+</Step>
+
+<Step>
+
+### Install dependencies
+
+Choose your package manager and run the install command:
+
+<Tabs items={["npm", "pnpm", "yarn"]} defaultIndex={0}>
+<Tab>
+
+```bash
+npm install
+```
+
+</Tab>
+<Tab>
+
+```bash
+pnpm install
+```
+
+</Tab>
+<Tab>
+
+```bash
+yarn install
+```
+
+</Tab>
+</Tabs>
+
+This installs all the required packages, including Next.js, Prisma, Igniter.js, and UI libraries.
+
+</Step>
+
+<Step>
+
+### Start PostgreSQL with Docker
+
+Launch the local database using Docker Compose:
+
+```bash
+npm run docker:up
+```
+
+This command starts PostgreSQL and any other services defined in `docker-compose.yml`, providing a local database instance for development.
+
+</Step>
+
+<Step>
+
+### Configure environment variables
+
+Copy the sample environment file and customize it for your setup:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` in your editor and fill in the required values. At minimum, set `DATABASE_URL` to point to your local PostgreSQL instance (usually `postgresql://username:password@localhost:5432/database_name`). For a full list of environment variables, refer to the Environment Setup guide.
+
+</Step>
+
+<Step>
+
+### Run database migrations
+
+Apply the database schema to your local PostgreSQL instance:
+
+```bash
+npm run db:migrate:dev
+```
+
+This uses Prisma to create the necessary tables and relationships as defined in `prisma/schema.prisma`, setting up your database for the application.
+
+</Step>
+
+<Step>
+
+### Start the development server
+
+Launch the Next.js development server:
+
+```bash
+npm run dev
+```
+
+The application will start at `http://localhost:3000`. Open this URL in your browser and navigate to `http://localhost:3000/docs` to explore the built-in documentation.
+
+</Step>
+
+<Step>
+
+### Optional: Set up Stripe webhooks for billing
+
+If you're working on payment features, start a local Stripe webhook listener in a separate terminal:
+
+```bash
+npm run stripe:webhook
+```
+
+This allows you to test Stripe events locally. Follow the CLI prompts to configure the webhook endpoint and secret.
+
+</Step>
+
+</Steps>
+
+</Tab>
+</Tabs>
+
+## Verify Your Setup
+
+To confirm everything is working:
+
+- The app should be accessible at `http://localhost:3000`.
+- Documentation is available at `http://localhost:3000/docs`.
+- Your database is populated with initial tables; run `npm run db:studio` to open Prisma Studio and inspect the data.
+
+## Troubleshooting
+
+- **Database connection issues**: Ensure Docker Desktop is running and the `DATABASE_URL` in `.env` matches the PostgreSQL service in `docker-compose.yml`.
+- **Missing environment variables**: Double-check that you've copied `.env.example` to `.env` and filled in all required keys. Next.js will show errors if critical variables are missing.
+- **Stripe webhook errors**: Re-run `npm run stripe:webhook` and ensure you've set the webhook secret provided by Stripe CLI in your `.env` file.
+
+## See Also
+
+- [Environment Setup](../environment-setup)
+- [Running Locally](../running-locally)
+- [Controllers and Procedures](../../core-concepts/controllers-and-procedures)
+- [Authentication](../../feature-guides/authentication)

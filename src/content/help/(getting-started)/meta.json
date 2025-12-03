@@ -1,0 +1,9 @@
+{
+  "title": "Getting Started",
+  "description": "Initial guide for new users to start using the platform.",
+  "icon": "Rocket",
+  "pages": [
+    "first-steps"
+  ],
+  "defaultOpen": true
+}

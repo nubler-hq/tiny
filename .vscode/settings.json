@@ -1,0 +1,22 @@
+{
+  // Git Settings
+  "git.ignoreLimitWarning": true,
+
+  // Chat General Settings
+  "chat.promptFiles": true,
+
+  // GitHub Copilot Chat Settings
+  "github.copilot.chat.edits.suggestRelatedFilesFromGitHistory": true, // Suggest related files from git history
+  "github.copilot.chat.edits.temporalContext.enabled": true, // Enable temporal context in chat edits
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // GitHub Copilot Instructions Configuration
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+
+  // Commit Message Configuration
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "text": "Follow Conventional Commits format. For example, 'feat: add new feature'." // Commit message format instructions
+    }
+  ],
+}

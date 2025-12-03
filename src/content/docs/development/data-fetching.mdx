@@ -1,0 +1,833 @@
+---
+title: Data Fetching
+description: Comprehensive data fetching strategies with Igniter client, server actions, ISR, and real-time updates.
+---
+
+By the end of this guide, you'll have mastered data fetching in your SaaS application using Igniter client, server actions, ISR, and real-time updates for optimal performance and user experience.
+
+## Overview
+
+The SaaS Boilerplate provides a comprehensive data fetching system built on Next.js App Router with Igniter.js, supporting multiple strategies for different use cases. Key features include:
+
+- **Type-safe API client**: Generated Igniter client with full TypeScript support
+- **Server-side rendering**: Direct database access in server components
+- **Client-side hydration**: React hooks with caching and real-time updates
+- **Server actions**: Secure mutations with progressive enhancement
+- **Incremental static regeneration**: Hybrid static/dynamic rendering
+- **Real-time subscriptions**: Live data updates via WebSockets
+- **Intelligent caching**: Request deduplication and smart invalidation
+- **Error boundaries**: Graceful error handling and retry mechanisms
+
+The system automatically chooses the optimal fetching strategy based on context (server vs client) while maintaining type safety and performance.
+
+## Architecture
+
+### Igniter Client System
+
+The Igniter client provides type-safe API access with automatic context switching:
+
+```typescript
+// src/igniter.client.ts - Generated client
+export const api = createIgniterClient<AppRouterType>({
+  baseURL: process.env.NEXT_PUBLIC_IGNITER_APP_URL,
+  basePATH: process.env.NEXT_PUBLIC_IGNITER_APP_BASE_PATH,
+  router: () => {
+    if (typeof window === 'undefined') {
+      // Server-side: Direct router access (zero HTTP overhead)
+      return require('./igniter.router').AppRouter
+    }
+    // Client-side: HTTP-based client with hooks
+    return require('./igniter.schema').AppRouterSchema
+  }
+})
+```
+
+### Data Fetching Strategies
+
+The system supports multiple fetching strategies optimized for different scenarios:
+
+**Server Components**: Direct database access with zero HTTP overhead
+**Client Components**: React hooks with caching and real-time updates
+**Server Actions**: Secure mutations with progressive enhancement
+**ISR**: Hybrid static/dynamic rendering for marketing content
+**Real-time**: WebSocket subscriptions for live data
+
+### Caching and Revalidation
+
+Igniter provides intelligent caching with automatic revalidation:
+
+```typescript
+// Automatic revalidation in mutations
+export const createPost = igniter.mutation({
+  handler: async ({ context, request }) => {
+    const post = await context.database.post.create({ data: request.body })
+    
+    // Automatically revalidate related queries
+    return response.revalidate(['posts.list']).created(post)
+  }
+})
+```
+
+## Setting Up Data Fetching
+
+<Steps>
+<Step>
+### Configure Environment Variables
+
+Set up the required environment variables for the Igniter client:
+
+```bash
+# Client-side API configuration
+NEXT_PUBLIC_IGNITER_APP_URL=http://localhost:3000
+NEXT_PUBLIC_IGNITER_APP_BASE_PATH=/api/v1
+```
+
+For production deployments:
+
+```bash
+NEXT_PUBLIC_IGNITER_APP_URL=https://yourapp.com
+NEXT_PUBLIC_IGNITER_APP_BASE_PATH=/api/v1
+```
+</Step>
+
+<Step>
+### Generate Type-Safe Client
+
+The Igniter client is automatically generated from your router. Ensure your controllers are properly defined:
+
+```typescript
+// Controllers are automatically discovered and typed
+export const userController = igniter.controller({
+  name: 'Users',
+  path: '/users',
+  actions: {
+    list: igniter.query({ /* ... */ }),
+    getById: igniter.query({ /* ... */ }),
+    create: igniter.mutation({ /* ... */ }),
+    update: igniter.mutation({ /* ... */ }),
+  }
+})
+```
+</Step>
+
+<Step>
+### Set Up Real-time Subscriptions (Optional)
+
+For real-time features, configure WebSocket connections:
+
+```typescript
+// Real-time subscriptions are built into Igniter hooks
+api.posts.list.useRealtime({
+  onMessage: (data) => {
+    // Handle real-time updates
+    console.log('New post:', data)
+  }
+})
+```
+</Step>
+
+<Step>
+### Configure ISR for Marketing Pages
+
+For documentation and marketing pages, enable ISR:
+
+```typescript
+// src/app/docs/page.tsx
+export const revalidate = 3600 // Revalidate every hour
+
+export default async function DocsPage() {
+  const docs = await api.docs.list.query()
+  return <DocsContent docs={docs.data} />
+}
+```
+</Step>
+</Steps>
+
+## Backend Usage (Procedures & Controllers)
+
+### Server-Side Data Fetching
+
+In server components and API routes, use direct Igniter client calls:
+
+```typescript
+// Server component with direct data access
+export default async function DashboardPage() {
+  // Zero HTTP overhead - direct database access
+  const stats = await api.analytics.stats.query()
+  const recentPosts = await api.posts.recent.query()
+  
+  return (
+    <Dashboard 
+      stats={stats.data} 
+      posts={recentPosts.data} 
+    />
+  )
+}
+```
+
+### Controller-Based Data Operations
+
+Define controllers with proper caching and revalidation:
+
+```typescript
+// User management controller
+export const userController = igniter.controller({
+  name: 'Users',
+  path: '/users',
+  actions: {
+    // Query with caching
+    list: igniter.query({
+      name: 'listUsers',
+      description: 'Get paginated user list',
+      method: 'GET',
+      path: '/',
+      use: [AuthFeatureProcedure()],
+      handler: async ({ context, request, response }) => {
+        const session = await context.auth.getSession({
+          requirements: 'authenticated',
+          roles: ['admin']
+        })
+        
+        const users = await context.database.user.findMany({
+          where: { organizationId: session.organization.id },
+          orderBy: { createdAt: 'desc' }
+        })
+        
+        return response.success(users)
+      }
+    }),
+    
+    // Mutation with revalidation
+    create: igniter.mutation({
+      name: 'createUser',
+      description: 'Create new user',
+      method: 'POST',
+      path: '/',
+      use: [AuthFeatureProcedure()],
+      body: z.object({
+        name: z.string(),
+        email: z.string().email(),
+        role: z.enum(['member', 'admin'])
+      }),
+      handler: async ({ context, request, response }) => {
+        const session = await context.auth.getSession({
+          requirements: 'authenticated',
+          roles: ['admin', 'owner']
+        })
+        
+        const user = await context.database.user.create({
+          data: {
+            ...request.body,
+            organizationId: session.organization.id
+          }
+        })
+        
+        // Revalidate user list for all connected clients
+        return response.revalidate(['users.list']).created(user)
+      }
+    })
+  }
+})
+```
+
+### Server Actions for Mutations
+
+Use server actions for secure form submissions:
+
+```typescript
+// app/actions/user-actions.ts
+'use server'
+
+import { api } from '@/igniter.client'
+import { revalidatePath } from 'next/cache'
+
+export async function createUserAction(formData: FormData) {
+  try {
+    const userData = {
+      name: formData.get('name') as string,
+      email: formData.get('email') as string,
+      role: formData.get('role') as string,
+    }
+    
+    const result = await api.users.create.mutate({ body: userData })
+    
+    // Revalidate the users page
+    revalidatePath('/users')
+    
+    return { success: true, user: result.data }
+  } catch (error) {
+    return { success: false, error: 'Failed to create user' }
+  }
+}
+```
+
+## Frontend Usage (Client-side)
+
+### React Hooks with Caching
+
+Use Igniter hooks in client components for automatic caching and updates:
+
+```typescript
+// Client component with hooks
+'use client'
+
+import { api } from '@/igniter.client'
+
+function UserList() {
+  // Automatic caching, loading states, and error handling
+  const { 
+    data: users, 
+    isLoading, 
+    error, 
+    refetch 
+  } = api.users.list.useQuery({
+    // Optional configuration
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000, // 30 seconds for real-time feel
+  })
+  
+  if (isLoading) return <UserListSkeleton />
+  if (error) return <ErrorMessage error={error} />
+  
+  return (
+    <div>
+      <button onClick={() => refetch()}>Refresh</button>
+      {users?.data.map(user => (
+        <UserCard key={user.id} user={user} />
+      ))}
+    </div>
+  )
+}
+```
+
+### Mutations with Optimistic Updates
+
+Handle mutations with automatic cache updates:
+
+```typescript
+function CreateUserForm() {
+  const { invalidate } = useQueryClient()
+  
+  const createUser = api.users.create.useMutation({
+    onSuccess: (newUser) => {
+      // Automatically invalidate and refetch related queries
+      invalidate(['users.list'])
+      toast.success('User created successfully!')
+    },
+    onError: (error) => {
+      toast.error('Failed to create user')
+    }
+  })
+  
+  const handleSubmit = async (formData: UserFormData) => {
+    await createUser.mutateAsync({ body: formData })
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* Form fields */}
+      <button type="submit" disabled={createUser.isPending}>
+        {createUser.isPending ? 'Creating...' : 'Create User'}
+      </button>
+    </form>
+  )
+}
+```
+
+### Real-time Subscriptions
+
+Subscribe to live data updates:
+
+```typescript
+function NotificationBell() {
+  const [notifications, setNotifications] = useState([])
+  
+  // Subscribe to real-time notifications
+  api.notifications.list.useRealtime({
+    onMessage: (update) => {
+      setNotifications(prev => [update, ...prev])
+    },
+    onError: (error) => {
+      console.error('Real-time connection failed:', error)
+    }
+  })
+  
+  return (
+    <div>
+      <BellIcon />
+      {notifications.length > 0 && (
+        <Badge count={notifications.length} />
+      )}
+    </div>
+  )
+}
+```
+
+### Query Invalidation and Refetching
+
+Manually control cache invalidation:
+
+```typescript
+function UserProfile({ userId }: { userId: string }) {
+  const { invalidate } = useQueryClient()
+  
+  const { data: user } = api.users.getById.useQuery({
+    params: { id: userId }
+  })
+  
+  const handleUpdateProfile = async () => {
+    // Update profile logic...
+    
+    // Invalidate specific queries
+    invalidate(['users.getById', userId])
+    invalidate(['users.list']) // Also refresh user list
+  }
+  
+  return <UserProfileForm user={user} onUpdate={handleUpdateProfile} />
+}
+```
+
+## Data Fetching Strategies
+
+### Server-Side Rendering (SSR)
+
+For dynamic, user-specific content:
+
+```typescript
+// Always server-rendered for fresh data
+export default async function DashboardPage() {
+  const session = await auth.getSession()
+  const dashboardData = await api.dashboard.stats.query({
+    params: { userId: session.user.id }
+  })
+  
+  return <Dashboard data={dashboardData.data} />
+}
+```
+
+### Static Site Generation (SSG) with ISR
+
+For marketing pages and documentation:
+
+```typescript
+// src/app/docs/page.tsx
+export const revalidate = 3600 // Revalidate every hour
+
+export default async function DocsPage() {
+  // Static generation with periodic revalidation
+  const docs = await api.docs.list.query()
+  
+  return <DocsLayout docs={docs.data} />
+}
+```
+
+### Client-Side Fetching
+
+For interactive features and user actions:
+
+```typescript
+// Client-side fetching for interactivity
+function SearchUsers() {
+  const [searchTerm, setSearchTerm] = useState('')
+  
+  const { data: users } = api.users.search.useQuery({
+    params: { q: searchTerm },
+    enabled: searchTerm.length > 2, // Only search when meaningful
+  })
+  
+  return (
+    <div>
+      <input 
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder="Search users..."
+      />
+      {users?.data.map(user => (
+        <UserResult key={user.id} user={user} />
+      ))}
+    </div>
+  )
+}
+```
+
+## Practical Examples
+
+### Backend: E-commerce Product Management
+
+Complete product CRUD with proper caching:
+
+```typescript
+// Product controller with caching and revalidation
+export const productController = igniter.controller({
+  name: 'Products',
+  path: '/products',
+  actions: {
+    list: igniter.query({
+      name: 'listProducts',
+      description: 'Get paginated product list',
+      method: 'GET',
+      path: '/',
+      handler: async ({ context, request, response }) => {
+        const { page = 1, limit = 20, category } = request.query
+        
+        const products = await context.database.product.findMany({
+          where: category ? { categoryId: category } : {},
+          skip: (page - 1) * limit,
+          take: limit,
+          include: { category: true }
+        })
+        
+        return response.success({
+          products,
+          pagination: { page, limit, total: products.length }
+        })
+      }
+    }),
+    
+    create: igniter.mutation({
+      name: 'createProduct',
+      description: 'Create new product',
+      method: 'POST',
+      path: '/',
+      use: [AuthFeatureProcedure()],
+      body: z.object({
+        name: z.string(),
+        price: z.number(),
+        categoryId: z.string()
+      }),
+      handler: async ({ context, request, response }) => {
+        const session = await context.auth.getSession({
+          requirements: 'authenticated',
+          roles: ['admin']
+        })
+        
+        const product = await context.database.product.create({
+          data: {
+            ...request.body,
+            organizationId: session.organization.id
+          }
+        })
+        
+        // Revalidate product lists
+        return response.revalidate(['products.list']).created(product)
+      }
+    })
+  }
+})
+```
+
+### Frontend: Real-time Chat Application
+
+Live chat with real-time message updates:
+
+```typescript
+function ChatRoom({ roomId }: { roomId: string }) {
+  const [messages, setMessages] = useState([])
+  const { invalidate } = useQueryClient()
+  
+  // Load initial messages
+  const { data: initialMessages } = api.chat.messages.useQuery({
+    params: { roomId },
+    staleTime: 30 * 1000 // 30 seconds
+  })
+  
+  // Subscribe to real-time updates
+  api.chat.messages.useRealtime({
+    params: { roomId },
+    onMessage: (newMessage) => {
+      setMessages(prev => [...prev, newMessage])
+    }
+  })
+  
+  // Send message mutation
+  const sendMessage = api.chat.sendMessage.useMutation({
+    onSuccess: () => {
+      // Message sent successfully, real-time will handle UI update
+    }
+  })
+  
+  const handleSendMessage = async (content: string) => {
+    await sendMessage.mutateAsync({
+      body: { roomId, content }
+    })
+  }
+  
+  const allMessages = [...(initialMessages?.data || []), ...messages]
+  
+  return (
+    <div className="chat-room">
+      <MessageList messages={allMessages} />
+      <MessageInput onSend={handleSendMessage} />
+    </div>
+  )
+}
+```
+
+### Backend: Analytics Dashboard
+
+Server-side analytics with caching:
+
+```typescript
+// Analytics controller with smart caching
+export const analyticsController = igniter.controller({
+  name: 'Analytics',
+  path: '/analytics',
+  actions: {
+    dashboard: igniter.query({
+      name: 'getDashboard',
+      description: 'Get dashboard analytics',
+      method: 'GET',
+      path: '/dashboard',
+      use: [AuthFeatureProcedure()],
+      handler: async ({ context, request, response }) => {
+        const session = await context.auth.getSession({
+          requirements: 'authenticated'
+        })
+        
+        const { period = '30d' } = request.query
+        
+        // Aggregate data from multiple sources
+        const [userStats, revenueStats, productStats] = await Promise.all([
+          context.database.user.groupBy({
+            by: ['createdAt'],
+            where: { 
+              organizationId: session.organization.id,
+              createdAt: { gte: getDateRange(period) }
+            },
+            _count: true
+          }),
+          context.database.order.aggregate({
+            where: { 
+              organizationId: session.organization.id,
+              createdAt: { gte: getDateRange(period) }
+            },
+            _sum: { total: true }
+          }),
+          context.database.product.findMany({
+            where: { organizationId: session.organization.id },
+            orderBy: { salesCount: 'desc' },
+            take: 5
+          })
+        ])
+        
+        return response.success({
+          users: userStats,
+          revenue: revenueStats._sum.total || 0,
+          topProducts: productStats
+        })
+      }
+    })
+  }
+})
+```
+
+## Data Fetching Patterns
+
+### Query Keys and Invalidation
+
+<TypeTable
+  type={{
+    'controller.action': {
+      description: 'Basic query key pattern',
+      type: 'string',
+      default: 'users.list, posts.getById',
+    },
+    'controller.action[param]': {
+      description: 'Parameterized query keys',
+      type: 'string',
+      default: 'users.getById[123], posts.byCategory[tech]',
+    },
+    'wildcard.*': {
+      description: 'Wildcard invalidation',
+      type: 'string',
+      default: 'users.* (invalidates all user queries)',
+    },
+  }}
+/>
+
+### Caching Strategies
+
+<TypeTable
+  type={{
+    'staleTime': {
+      description: 'How long data stays fresh',
+      type: 'number (ms)',
+      default: '5 * 60 * 1000 (5 minutes)',
+    },
+    'refetchOnWindowFocus': {
+      description: 'Refetch when window regains focus',
+      type: 'boolean',
+      default: 'true',
+    },
+    'refetchInterval': {
+      description: 'Periodic refetch interval',
+      type: 'number (ms)',
+      default: '30000 (30 seconds)',
+    },
+    'enabled': {
+      description: 'Conditionally enable query',
+      type: 'boolean',
+      default: 'true',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Queries not updating after mutations">
+Ensure you're using `response.revalidate(['query.key'])` in your mutations. Check that the query key matches exactly. Use `invalidate()` in client components for manual invalidation.
+</Accordion>
+
+<Accordion title="Server components showing stale data">
+Server components always fetch fresh data. If you need real-time updates, consider using client components with hooks or WebSocket subscriptions.
+</Accordion>
+
+<Accordion title="TypeScript errors with Igniter client">
+Run `npm run build` to regenerate the client types. Ensure your controllers are properly exported and follow the Igniter conventions.
+</Accordion>
+
+<Accordion title="Real-time subscriptions not working">
+Check WebSocket connection and server configuration. Ensure the subscription endpoint is properly configured in your Igniter router.
+</Accordion>
+
+<Accordion title="ISR pages not revalidating">
+Verify `revalidate` export is set correctly. Check that the revalidation is triggered from mutations. Use `revalidatePath()` for Next.js cache invalidation.
+</Accordion>
+
+<Accordion title="Memory leaks with subscriptions">
+Always clean up subscriptions in `useEffect` cleanup functions. Use the subscription object's `unsubscribe()` method when components unmount.
+</Accordion>
+
+<Accordion title="Server actions not working">
+Ensure you're using `'use server'` directive. Server actions must be in separate files or properly marked. Check that form data is correctly serialized.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Choose the right fetching strategy">
+Use server components for initial page loads, client components for interactivity, and ISR for marketing content. Don't over-fetch on the client.
+</Accordion>
+
+<Accordion title="Implement proper error boundaries">
+Wrap data-fetching components with error boundaries. Provide fallback UI and retry mechanisms for failed requests.
+</Accordion>
+
+<Accordion title="Use optimistic updates sparingly">
+Optimistic updates can improve UX but may cause confusion. Use them only for simple mutations with high success rates.
+</Accordion>
+
+<Accordion title="Leverage caching effectively">
+Set appropriate `staleTime` values based on data freshness requirements. Use `refetchOnWindowFocus` for user-specific data.
+</Accordion>
+
+<Accordion title="Handle loading states properly">
+Always show loading states during data fetching. Use skeleton components for better UX. Avoid layout shifts.
+</Accordion>
+
+<Accordion title="Secure your mutations">
+Use server actions for sensitive operations. Validate input on both client and server. Implement proper authorization checks.
+</Accordion>
+
+<Accordion title="Monitor performance">
+Track query performance and cache hit rates. Use React DevTools Profiler to identify unnecessary re-renders. Optimize bundle size.
+</Accordion>
+
+<Accordion title="Test data fetching thoroughly">
+Test loading states, error states, and cache invalidation. Use tools like MSW for API mocking. Test real-time features with WebSocket simulation.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Controllers and Procedures](../controllers-and-procedures) - Backend API structure
+- [Authentication & Sessions](../authentication-and-sessions) - User context in data fetching
+- [Jobs & Queues](../jobs-and-queues) - Background processing for data operations
+- [Notifications](../notifications) - Real-time updates integration
+- [Content Layer](../content-layer) - ISR for documentation and content
+
+## API Reference
+
+### Igniter Client Methods
+
+<TypeTable
+  type={{
+    'api.controller.action.query(params)': {
+      description: 'Execute query with optional parameters',
+      type: 'Promise<QueryResult>',
+      default: 'Server-side direct call',
+    },
+    'api.controller.action.useQuery(options)': {
+      description: 'React hook for queries with caching',
+      type: 'QueryHook',
+      default: 'Client-side with automatic caching',
+    },
+    'api.controller.action.mutate(params)': {
+      description: 'Execute mutation with parameters',
+      type: 'Promise<MutationResult>',
+      default: 'Server-side direct call',
+    },
+    'api.controller.action.useMutation(options)': {
+      description: 'React hook for mutations',
+      type: 'MutationHook',
+      default: 'Client-side with optimistic updates',
+    },
+    'api.controller.action.useRealtime(options)': {
+      description: 'Subscribe to real-time updates',
+      type: 'SubscriptionHook',
+      default: 'WebSocket-based live updates',
+    },
+  }}
+/>
+
+### Query Client Methods
+
+<TypeTable
+  type={{
+    'invalidate(keys)': {
+      description: 'Invalidate specific query keys',
+      type: 'void',
+      default: 'Triggers refetch for matched queries',
+    },
+    'refetch(keys)': {
+      description: 'Manually refetch queries',
+      type: 'void',
+      default: 'Forces fresh data fetch',
+    },
+    'setQueryData(key, data)': {
+      description: 'Manually set query cache data',
+      type: 'void',
+      default: 'Updates cache without API call',
+    },
+  }}
+/>
+
+### Configuration Options
+
+<TypeTable
+  type={{
+    'staleTime': {
+      description: 'Cache freshness duration',
+      type: 'number',
+      default: '5 * 60 * 1000',
+    },
+    'refetchOnMount': {
+      description: 'Refetch on component mount',
+      type: 'boolean',
+      default: 'true',
+    },
+    'refetchOnWindowFocus': {
+      description: 'Refetch when window gains focus',
+      type: 'boolean',
+      default: 'true',
+    },
+    'enabled': {
+      description: 'Enable/disable query execution',
+      type: 'boolean',
+      default: 'true',
+    },
+  }}
+/>

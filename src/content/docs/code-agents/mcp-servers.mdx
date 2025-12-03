@@ -1,0 +1,1764 @@
+---
+title: MCP Servers
+description: Comprehensive guide to configuring and using Model Context Protocol servers for code generation, UI scaffolding, browser testing, and database operations.
+---
+
+By the end of this guide, you'll have a complete understanding of how to configure each MCP server in your SaaS Boilerplate project, what tools they provide, and how to use them effectively with Lia and other code agents.
+
+## Overview
+
+Model Context Protocol (MCP) servers extend your code agent's capabilities by providing specialized tools for different tasks. The SaaS Boilerplate configures several key MCP servers that work seamlessly with Igniter.js and your development workflow:
+
+- **Igniter.js MCP**: All these capabilities—development lifecycle management, code generation, API validation, documentation, code analysis, project management, knowledge base, task organization, and agent delegation—are provided as part of the Igniter.js MCP server.
+- **Shadcn UI MCP**: UI component scaffolding and design system integration
+- **Playwright MCP**: Automated browser testing and interaction
+- **Postgres MCP**: Database introspection and query operations
+
+These servers are defined in your project's `.mcp.json` file and are automatically available to configured code agents like Lia.
+
+## Configuration File Structure
+
+The `.mcp.json` file in your project root defines how each MCP server runs. Here's the complete configuration structure:
+
+```json
+{
+  "mcpServers": {
+    "igniter": {
+      "command": "npx",
+      "args": ["-y", "@igniter-js/mcp-server@latest"],
+      "env": {}
+    },
+    "browser": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": {}
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"],
+      "env": {}
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://..."],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "postgresql://username:password@localhost:5432/database"
+      }
+    }
+  }
+}
+```
+
+<Accordions type="multiple">
+<Accordion title="Environment Variables">
+Keep sensitive information like database credentials and API tokens out of the config file. Use environment variables in the `env` section, which will be loaded from your system's environment or `.env` files.
+</Accordion>
+<Accordion title="Automatic Installation">
+The `-y` flag in npm commands automatically installs packages if they're not present, ensuring the servers work immediately after configuration.
+</Accordion>
+</Accordions>
+
+## Igniter.js MCP Server
+
+The Igniter.js MCP server provides comprehensive tools for the complete development lifecycle, including server management, code generation, API testing, documentation, and advanced code analysis capabilities.
+
+### Configuration Options
+
+<TypeTable
+  type={{
+    command: {
+      description: 'Command to run the server',
+      type: 'string',
+      default: '"npx"'
+    },
+    args: {
+      description: 'Arguments passed to the command',
+      type: 'array',
+      default: '["-y", "@igniter-js/mcp-server@latest"]'
+    },
+    env: {
+      description: 'Environment variables for the server',
+      type: 'object',
+      default: '{}'
+    }
+  }}
+/>
+
+### Available Tools
+
+<Accordions type="multiple">
+<Accordion title="start_dev_server - Start development server">
+Starts the Igniter.js development server for local development and testing, providing hot reload and API endpoints for testing.
+
+**Parameters**
+<TypeTable
+  type={{
+    none: {
+      description: 'No parameters required',
+      type: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="build_project - Build for production">
+Builds the project for production deployment, optimizing assets and preparing the application for deployment.
+
+**Parameters**
+<TypeTable
+  type={{
+    none: {
+      description: 'No parameters required',
+      type: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="run_tests - Execute test suite">
+Executes the test suite to validate code quality and functionality, ensuring all components work correctly.
+
+**Parameters**
+<TypeTable
+  type={{
+    none: {
+      description: 'No parameters required',
+      type: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="generate_feature - Create new feature">
+Creates a new feature scaffold with complete structure, including controllers, procedures, and basic setup.
+
+**Parameters**
+<TypeTable
+  type={{
+    name: {
+      description: 'Feature name',
+      type: 'string'
+    },
+    schema: {
+      description: 'Optional database schema',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="generate_controller - Add API controller">
+Adds a new API controller to an existing feature, creating endpoints for data operations.
+
+**Parameters**
+<TypeTable
+  type={{
+    name: {
+      description: 'Controller name',
+      type: 'string'
+    },
+    feature: {
+      description: 'Target feature',
+      type: 'string'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="generate_procedure - Create business logic procedure">
+Creates reusable business logic procedures for implementing complex operations and middleware.
+
+**Parameters**
+<TypeTable
+  type={{
+    name: {
+      description: 'Procedure name',
+      type: 'string'
+    },
+    feature: {
+      description: 'Target feature',
+      type: 'string'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="generate_schema - Generate type-safe client">
+Generates type-safe client code from API definitions for seamless frontend-backend integration.
+
+**Parameters**
+<TypeTable
+  type={{
+    output: {
+      description: 'Output directory',
+      type: 'string',
+      default: 'null'
+    },
+    watch: {
+      description: 'Watch for changes',
+      type: 'boolean',
+      default: 'false'
+    },
+    docs: {
+      description: 'Generate documentation',
+      type: 'boolean',
+      default: 'false'
+    },
+    docsOutput: {
+      description: 'Documentation output directory',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="generate_docs - Create API documentation">
+Creates API documentation from code annotations, providing interactive docs for developers.
+
+**Parameters**
+<TypeTable
+  type={{
+    output: {
+      description: 'Output directory',
+      type: 'string',
+      default: 'null'
+    },
+    ui: {
+      description: 'Generate interactive UI',
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="get_openapi_spec - Retrieve OpenAPI specification">
+Retrieves the OpenAPI specification from a running server to validate API contracts and understand available endpoints.
+
+**Parameters**
+<TypeTable
+  type={{
+    url: {
+      description: 'API documentation URL',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="make_api_request - Execute HTTP requests">
+Executes HTTP requests for API testing and validation, allowing comprehensive testing of backend endpoints.
+
+**Parameters**
+<TypeTable
+  type={{
+    method: {
+      description: 'HTTP method',
+      type: '"GET"|"POST"|"PUT"|"DELETE"|"PATCH"'
+    },
+    url: {
+      description: 'Request URL',
+      type: 'string'
+    },
+    headers: {
+      description: 'Request headers',
+      type: 'Record<string,string>',
+      default: 'null'
+    },
+    body: {
+      description: 'Request body',
+      type: 'any',
+      default: 'null'
+    },
+    timeout: {
+      description: 'Request timeout in milliseconds',
+      type: 'number',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="get_documentation - Fetch external documentation">
+Fetches and converts external documentation to markdown format for easy reference and learning.
+
+**Parameters**
+<TypeTable
+  type={{
+    source: {
+      description: 'Documentation source',
+      type: '"igniter"|"nextjs"|"react"|"typescript"|"custom"'
+    },
+    topic: {
+      description: 'Documentation topic',
+      type: 'string'
+    },
+    url: {
+      description: 'Custom URL for documentation',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="analyze_file - Comprehensive file analysis">
+Performs comprehensive file analysis with error detection, providing structure, imports, and health information.
+
+**Parameters**
+<TypeTable
+  type={{
+    filePath: {
+      description: 'Path to the file to analyze',
+      type: 'string'
+    },
+    includeErrors: {
+      description: 'Include error analysis',
+      type: 'boolean',
+      default: 'true'
+    },
+    projectRoot: {
+      description: 'Project root directory',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="analyze_feature - Feature analysis">
+Provides comprehensive analysis of features including structure, health, and API endpoints.
+
+**Parameters**
+<TypeTable
+  type={{
+    featurePath: {
+      description: 'Path to the feature directory',
+      type: 'string'
+    },
+    projectRoot: {
+      description: 'Project root directory',
+      type: 'string',
+      default: 'null'
+    },
+    includeStats: {
+      description: 'Include statistical analysis',
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="find_implementation - Locate symbol definitions">
+Locates symbol definitions and implementations, helping resolve TypeScript errors and find API definitions.
+
+**Parameters**
+<TypeTable
+  type={{
+    symbol: {
+      description: 'Symbol to find',
+      type: 'string'
+    },
+    filePath: {
+      description: 'Starting file path',
+      type: 'string'
+    },
+    projectRoot: {
+      description: 'Project root directory',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="explore_source - Deep file analysis">
+Performs deep analysis of source files and dependencies, providing detailed insights into implementations.
+
+**Parameters**
+<TypeTable
+  type={{
+    filePath: {
+      description: 'Path to the file to explore',
+      type: 'string'
+    },
+    symbol: {
+      description: 'Specific symbol to analyze',
+      type: 'string',
+      default: 'null'
+    },
+    includeContext: {
+      description: 'Include surrounding context',
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="trace_dependency_chain - Map import chains">
+Maps import chains and dependency relationships, helping understand complex code dependencies.
+
+**Parameters**
+<TypeTable
+  type={{
+    symbol: {
+      description: 'Symbol to trace',
+      type: 'string'
+    },
+    startFile: {
+      description: 'Starting file for tracing',
+      type: 'string'
+    },
+    maxDepth: {
+      description: 'Maximum tracing depth',
+      type: 'number',
+      default: '5'
+    }
+  }}
+/>
+</Accordion>
+<Accordion title="search_github_issues - Search GitHub issues">
+Searches for GitHub issues and pull requests to find solutions, track problems, and gather community insights.
+
+**Parameters**
+<TypeTable
+  type={{
+    query: {
+      description: 'Search query',
+      type: 'string'
+    },
+    repository: {
+      description: 'Target repository',
+      type: 'string',
+      default: 'null'
+    },
+    state: {
+      description: 'Issue state',
+      type: '"open"|"closed"|"all"',
+      default: '"open"'
+    },
+    labels: {
+      description: 'Issue labels',
+      type: 'string[]',
+      default: 'null'
+    },
+    sort: {
+      description: 'Sort order',
+      type: '"created"|"updated"|"comments"',
+      default: '"created"'
+    },
+    order: {
+      description: 'Sort direction',
+      type: '"asc"|"desc"',
+      default: '"desc"'
+    },
+    per_page: {
+      description: 'Results per page',
+      type: 'number',
+      default: '30'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="create_github_issue - Create GitHub issue">
+Creates new GitHub issues for tracking bugs, features, or documentation needs.
+
+**Parameters**
+<TypeTable
+  type={{
+    title: {
+      description: 'Issue title',
+      type: 'string'
+    },
+    body: {
+      description: 'Issue description',
+      type: 'string'
+    },
+    repository: {
+      description: 'Target repository',
+      type: 'string',
+      default: 'null'
+    },
+    labels: {
+      description: 'Issue labels',
+      type: 'string[]',
+      default: 'null'
+    },
+    assignees: {
+      description: 'Issue assignees',
+      type: 'string[]',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="list_issues - List repository issues">
+Lists repository issues with advanced filtering for project planning and issue prioritization.
+
+**Parameters**
+<TypeTable
+  type={{
+    owner: {
+      description: 'Repository owner',
+      type: 'string'
+    },
+    repo: {
+      description: 'Repository name',
+      type: 'string'
+    },
+    after: {
+      description: 'Cursor for pagination',
+      type: 'string',
+      default: 'null'
+    },
+    direction: {
+      description: 'Sort direction',
+      type: '"ASC"|"DESC"',
+      default: '"DESC"'
+    },
+    labels: {
+      description: 'Filter by labels',
+      type: 'string[]',
+      default: 'null'
+    },
+    orderBy: {
+      description: 'Sort field',
+      type: '"CREATED_AT"|"UPDATED_AT"|"COMMENTS"',
+      default: '"CREATED_AT"'
+    },
+    perPage: {
+      description: 'Results per page',
+      type: 'number',
+      default: '20'
+    },
+    since: {
+      description: 'Filter by date',
+      type: 'string',
+      default: 'null'
+    },
+    state: {
+      description: 'Issue state',
+      type: '"OPEN"|"CLOSED"',
+      default: '"OPEN"'
+    }
+  }}
+/>
+</Accordion>
+<Accordion title="store_memory - Store knowledge and patterns">
+Stores knowledge, decisions, and patterns as MDX files for future reference and learning.
+
+**Parameters**
+<TypeTable
+  type={{
+    type: {
+      description: 'Memory type',
+      type: 'enum'
+    },
+    title: {
+      description: 'Memory title',
+      type: 'string'
+    },
+    content: {
+      description: 'Memory content',
+      type: 'string'
+    },
+    category: {
+      description: 'Memory category',
+      type: 'string',
+      default: 'null'
+    },
+    confidence: {
+      description: 'Confidence level',
+      type: 'number',
+      default: 'null'
+    },
+    tags: {
+      description: 'Memory tags',
+      type: 'string[]',
+      default: 'null'
+    },
+    related_memories: {
+      description: 'Related memory IDs',
+      type: 'string[]',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="search_memories - Find stored knowledge">
+Searches through stored memories to find existing knowledge, patterns, and decisions.
+
+**Parameters**
+<TypeTable
+  type={{
+    text: {
+      description: 'Search text',
+      type: 'string',
+      default: 'null'
+    },
+    tags: {
+      description: 'Filter by tags',
+      type: 'string[]',
+      default: 'null'
+    },
+    type: {
+      description: 'Filter by type',
+      type: 'enum',
+      default: 'null'
+    },
+    confidence_min: {
+      description: 'Minimum confidence',
+      type: 'number',
+      default: 'null'
+    },
+    confidence_max: {
+      description: 'Maximum confidence',
+      type: 'number',
+      default: 'null'
+    },
+    include_sensitive: {
+      description: 'Include sensitive memories',
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="relate_memories - Create memory relationships">
+Creates relationships between memories to build knowledge graphs and connect related concepts.
+
+**Parameters**
+<TypeTable
+  type={{
+    from_type: {
+      description: 'Source memory type',
+      type: 'enum'
+    },
+    from_id: {
+      description: 'Source memory ID',
+      type: 'string'
+    },
+    to_type: {
+      description: 'Target memory type',
+      type: 'enum'
+    },
+    to_id: {
+      description: 'Target memory ID',
+      type: 'string'
+    },
+    relationship_type: {
+      description: 'Relationship type',
+      type: 'enum'
+    },
+    strength: {
+      description: 'Relationship strength',
+      type: 'number',
+      default: 'null'
+    },
+    confidence: {
+      description: 'Confidence level',
+      type: 'number',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="visualize_memory_graph - Generate knowledge graph">
+Generates Mermaid diagrams showing relationships between memories and knowledge connections.
+
+**Parameters**
+<TypeTable
+  type={{
+    center_type: {
+      description: 'Center memory type',
+      type: 'enum'
+    },
+    center_id: {
+      description: 'Center memory ID',
+      type: 'string'
+    },
+    depth: {
+      description: 'Graph depth',
+      type: 'number',
+      default: '2'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="reflect_on_memories - Create learning reflections">
+Creates learning reflections and insights based on stored memories and development experiences.
+
+**Parameters**
+<TypeTable
+  type={{
+    title: {
+      description: 'Reflection title',
+      type: 'string',
+      default: 'null'
+    },
+    content: {
+      description: 'Reflection content',
+      type: 'string',
+      default: 'null'
+    },
+    tags: {
+      description: 'Reflection tags',
+      type: 'string[]',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+<Accordion title="create_task - Create development task">
+Creates new development tasks with comprehensive metadata for tracking and organization.
+
+**Parameters**
+<TypeTable
+  type={{
+    title: {
+      description: 'Task title',
+      type: 'string'
+    },
+    description: {
+      description: 'Task description',
+      type: 'string'
+    },
+    feature_id: {
+      description: 'Associated feature ID',
+      type: 'string',
+      default: 'null'
+    },
+    epic_id: {
+      description: 'Associated epic ID',
+      type: 'string',
+      default: 'null'
+    },
+    priority: {
+      description: 'Task priority',
+      type: '"low"|"medium"|"high"|"urgent"',
+      default: '"medium"'
+    },
+    estimated_hours: {
+      description: 'Estimated hours',
+      type: 'number',
+      default: 'null'
+    },
+    tags: {
+      description: 'Task tags',
+      type: 'string[]',
+      default: 'null'
+    },
+    dependencies: {
+      description: 'Task dependencies',
+      type: 'string[]',
+      default: 'null'
+    },
+    assignee: {
+      description: 'Task assignee',
+      type: '"lia"|"human"|"agent"',
+      default: '"lia"'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="list_tasks - List and filter tasks">
+Lists and filters project tasks with advanced options for project planning and workload management.
+
+**Parameters**
+<TypeTable
+  type={{
+    status: {
+      description: 'Task status filter',
+      type: '"todo"|"in_progress"|"blocked"|"testing"|"done"|"cancelled"',
+      default: 'null'
+    },
+    priority: {
+      description: 'Priority filter',
+      type: '"low"|"medium"|"high"|"urgent"',
+      default: 'null'
+    },
+    feature_id: {
+      description: 'Feature filter',
+      type: 'string',
+      default: 'null'
+    },
+    assignee: {
+      description: 'Assignee filter',
+      type: 'string',
+      default: 'null'
+    },
+    include_subtasks: {
+      description: 'Include subtasks',
+      type: 'boolean',
+      default: 'false'
+    },
+    limit: {
+      description: 'Result limit',
+      type: 'number',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="update_task_status - Update task progress">
+Updates task status and adds progress notes for tracking development workflow.
+
+**Parameters**
+<TypeTable
+  type={{
+    task_id: {
+      description: 'Task ID to update',
+      type: 'string'
+    },
+    new_status: {
+      description: 'New task status',
+      type: '"todo"|"in_progress"|"blocked"|"testing"|"done"|"cancelled"'
+    },
+    notes: {
+      description: 'Progress notes',
+      type: 'string',
+      default: 'null'
+    },
+    completion_notes: {
+      description: 'Completion details',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="delete_task - Remove task">
+Removes tasks with dependency management for project cleanup and scope changes.
+
+**Parameters**
+<TypeTable
+  type={{
+    task_id: {
+      description: 'Task ID to delete',
+      type: 'string'
+    },
+    handle_dependencies: {
+      description: 'Dependency handling strategy',
+      type: '"fail"|"cascade"|"unlink"',
+      default: '"fail"'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="reorder_tasks - Reorganize task order">
+Reorganizes task execution order within a scope for optimizing development workflow.
+
+**Parameters**
+<TypeTable
+  type={{
+    scope_id: {
+      description: 'Scope identifier',
+      type: 'string'
+    },
+    task_order: {
+      description: 'New task order',
+      type: 'string[]'
+    }
+  }}
+/>
+</Accordion>
+<Accordion title="delegate_to_agent - Delegate to AI agent">
+Delegates complex tasks to specialized AI agents for parallel processing and specialized expertise.
+
+**Parameters**
+<TypeTable
+  type={{
+    task_id: {
+      description: 'Task to delegate',
+      type: 'string'
+    },
+    agent_type: {
+      description: 'Agent specialization',
+      type: '"claude"|"gemini"|"gpt"|"perplexity"'
+    },
+    execution_mode: {
+      description: 'Execution mode',
+      type: '"background"|"sync"',
+      default: '"background"'
+    },
+    execution_config: {
+      description: 'Execution configuration',
+      type: 'object',
+      default: 'null'
+    },
+    context: {
+      description: 'Additional context',
+      type: 'object',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="monitor_agent_tasks - Monitor agent progress">
+Monitors progress of delegated agent tasks with detailed logging and analytics.
+
+**Parameters**
+<TypeTable
+  type={{
+    agent_type: {
+      description: 'Agent type filter',
+      type: '"all"|"claude"|"gemini"|"gpt"|"perplexity"',
+      default: '"all"'
+    },
+    include_logs: {
+      description: 'Include execution logs',
+      type: 'boolean',
+      default: 'false'
+    },
+    include_analytics: {
+      description: 'Include performance analytics',
+      type: 'boolean',
+      default: 'false'
+    },
+    log_lines: {
+      description: 'Number of log lines',
+      type: 'number',
+      default: '100'
+    },
+    task_filter: {
+      description: 'Task filter pattern',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="check_delegation_status - Check task status">
+Checks the status of a specific delegated task for progress tracking.
+
+**Parameters**
+<TypeTable
+  type={{
+    task_id: {
+      description: 'Task ID to check',
+      type: 'string'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="list_active_delegations - List active delegations">
+Lists all currently active delegated tasks for resource management and oversight.
+
+**Parameters**
+<TypeTable
+  type={{
+    include_recent: {
+      description: 'Include recently completed',
+      type: 'boolean',
+      default: 'false'
+    },
+    max_results: {
+      description: 'Maximum results',
+      type: 'number',
+      default: '20'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="cancel_delegation - Cancel running task">
+Cancels a running delegated task to free resources or stop unnecessary work.
+
+**Parameters**
+<TypeTable
+  type={{
+    task_id: {
+      description: 'Task ID to cancel',
+      type: 'string'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="check_agent_environment - Verify agent setup">
+Verifies agent environment configuration and setup before delegation.
+
+**Parameters**
+<TypeTable
+  type={{
+    check_docker: {
+      description: 'Check Docker availability',
+      type: 'boolean',
+      default: 'false'
+    },
+    check_api_keys: {
+      description: 'Check API key configuration',
+      type: 'boolean',
+      default: 'false'
+    },
+    detailed_report: {
+      description: 'Generate detailed report',
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="setup_agent_environment - Configure agent environment">
+Guides through environment setup for agent delegation with platform-specific configurations.
+
+**Parameters**
+<TypeTable
+  type={{
+    platform: {
+      description: 'Target platform',
+      type: '"auto"|"macos"|"linux"|"windows"',
+      default: '"auto"'
+    },
+    include_docker: {
+      description: 'Include Docker setup',
+      type: 'boolean',
+      default: 'false'
+    },
+    include_api_setup: {
+      description: 'Include API key setup',
+      type: 'boolean',
+      default: 'false'
+    },
+    format: {
+      description: 'Output format',
+      type: '"markdown"|"shell"',
+      default: '"markdown"'
+    }
+  }}
+/>
+</Accordion>
+</Accordions>
+
+## Shadcn UI MCP Server
+
+The Shadcn UI MCP server enables rapid scaffolding of UI components using your project's design system, focusing on component generation and theme customization.
+
+### Configuration Options
+
+<TypeTable
+  type={{
+    command: {
+      description: 'Command to run the server',
+      type: 'string',
+      default: '"npx"'
+    },
+    args: {
+      description: 'Arguments passed to the command',
+      type: 'array',
+      default: '["shadcn@latest", "mcp"]'
+    },
+    env: {
+      description: 'Environment variables for the server',
+      type: 'object',
+      default: '{}'
+    },
+    cwd: {
+      description: 'Working directory for the server',
+      type: 'string',
+      default: 'process.cwd()'
+    }
+  }}
+/>
+
+### Available Tools
+
+<Accordions type="multiple">
+<Accordion title="add_component - Add UI component">
+Adds a Shadcn UI component to your project from the available component library.
+
+**Parameters**
+<TypeTable
+  type={{
+    component: {
+      description: 'Component name',
+      type: 'string'
+    },
+    path: {
+      description: 'Installation path',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="scaffold_form - Create form component">
+Creates a complete form component with validation using Shadcn UI form components.
+
+**Parameters**
+<TypeTable
+  type={{
+    name: {
+      description: 'Form component name',
+      type: 'string'
+    },
+    fields: {
+      description: 'Form field definitions',
+      type: 'array'
+    },
+    validation: {
+      description: 'Validation rules',
+      type: 'object',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="generate_table - Create data table">
+Creates a data table component with sorting, filtering, and pagination capabilities.
+
+**Parameters**
+<TypeTable
+  type={{
+    name: {
+      description: 'Table component name',
+      type: 'string'
+    },
+    columns: {
+      description: 'Column definitions',
+      type: 'array'
+    },
+    dataSource: {
+      description: 'Data source type',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="customize_theme - Modify theme configuration">
+Modifies the Shadcn UI theme configuration for consistent design system customization.
+
+**Parameters**
+<TypeTable
+  type={{
+    colors: {
+      description: 'Color overrides',
+      type: 'object',
+      default: 'null'
+    },
+    typography: {
+      description: 'Typography settings',
+      type: 'object',
+      default: 'null'
+    },
+    spacing: {
+      description: 'Spacing scale',
+      type: 'object',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+</Accordions>
+
+## Playwright MCP Server
+
+The Playwright MCP server provides browser automation tools for testing, scraping, and UI validation, enabling autonomous front-end testing and research.
+
+### Configuration Options
+
+<TypeTable
+  type={{
+    command: {
+      description: 'Command to run the server',
+      type: 'string',
+      default: '"npx"'
+    },
+    args: {
+      description: 'Arguments passed to the command',
+      type: 'array',
+      default: '["@playwright/mcp@latest"]'
+    },
+    env: {
+      description: 'Environment variables for the server',
+      type: 'object',
+      default: '{}'
+    },
+    browser: {
+      description: 'Default browser to use',
+      type: 'string',
+      default: '"chromium"',
+      options: '["chromium", "firefox", "webkit"]'
+    },
+    headless: {
+      description: 'Run browser in headless mode',
+      type: 'boolean',
+      default: 'true'
+    }
+  }}
+/>
+
+### Available Tools
+
+<Accordions type="multiple">
+<Accordion title="browser_navigate - Navigate to URL">
+Navigates to a URL and loads the page for testing and interaction.
+
+**Parameters**
+<TypeTable
+  type={{
+    url: {
+      description: 'Target URL',
+      type: 'string'
+    },
+    waitUntil: {
+      description: 'Wait condition',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_click - Click element">
+Clicks on an element identified by selector for user interaction simulation.
+
+**Parameters**
+<TypeTable
+  type={{
+    selector: {
+      description: 'Element selector',
+      type: 'string'
+    },
+    options: {
+      description: 'Click options',
+      type: 'object',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_snapshot - Capture screenshot">
+Captures a screenshot of the current page or specific element for visual validation.
+
+**Parameters**
+<TypeTable
+  type={{
+    selector: {
+      description: 'Element selector',
+      type: 'string',
+      default: 'null'
+    },
+    options: {
+      description: 'Screenshot options',
+      type: 'object',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_fill - Fill form field">
+Fills a form field with text for form testing and data entry automation.
+
+**Parameters**
+<TypeTable
+  type={{
+    selector: {
+      description: 'Field selector',
+      type: 'string'
+    },
+    value: {
+      description: 'Value to fill',
+      type: 'string'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_evaluate - Execute JavaScript">
+Executes JavaScript in the browser context for advanced interactions and validation.
+
+**Parameters**
+<TypeTable
+  type={{
+    script: {
+      description: 'JavaScript code',
+      type: 'string'
+    },
+    args: {
+      description: 'Script arguments',
+      type: 'array',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_wait_for - Wait for condition">
+Waits for an element or condition to be met before proceeding with tests.
+
+**Parameters**
+<TypeTable
+  type={{
+    selector: {
+      description: 'Element selector',
+      type: 'string',
+      default: 'null'
+    },
+    state: {
+      description: 'Wait state',
+      type: 'string',
+      default: 'null'
+    },
+    timeout: {
+      description: 'Wait timeout',
+      type: 'number',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_press_key - Simulate key press">
+Simulates keyboard key presses for accessibility testing and form submission.
+
+**Parameters**
+<TypeTable
+  type={{
+    key: {
+      description: 'Key to press',
+      type: 'string'
+    },
+    selector: {
+      description: 'Target element selector',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_console_messages - Retrieve console messages">
+Retrieves console messages from the browser for debugging and error detection.
+
+**Parameters**
+<TypeTable
+  type={{
+    clear: {
+      description: 'Clear messages after retrieval',
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_network_requests - Capture network requests">
+Captures network requests made by the page for API call analysis and debugging.
+
+**Parameters**
+<TypeTable
+  type={{
+    filter: {
+      description: 'Request filter criteria',
+      type: 'object',
+      default: 'null'
+    },
+    include_response: {
+      description: 'Include response data',
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_take_screenshot - Advanced screenshot">
+Takes screenshots with advanced options for comprehensive visual testing.
+
+**Parameters**
+<TypeTable
+  type={{
+    options: {
+      description: 'Screenshot options',
+      type: 'object',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_select_option - Select dropdown option">
+Selects an option from a dropdown or select element for form interaction.
+
+**Parameters**
+<TypeTable
+  type={{
+    selector: {
+      description: 'Select element selector',
+      type: 'string'
+    },
+    value: {
+      description: 'Option value',
+      type: 'string',
+      default: 'null'
+    },
+    label: {
+      description: 'Option label',
+      type: 'string',
+      default: 'null'
+    },
+    index: {
+      description: 'Option index',
+      type: 'number',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_hover - Hover over element">
+Hovers over an element to trigger hover effects and test interactive states.
+
+**Parameters**
+<TypeTable
+  type={{
+    selector: {
+      description: 'Element selector',
+      type: 'string'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_drag - Perform drag and drop">
+Performs drag and drop operations for testing advanced UI interactions.
+
+**Parameters**
+<TypeTable
+  type={{
+    sourceSelector: {
+      description: 'Source element selector',
+      type: 'string'
+    },
+    targetSelector: {
+      description: 'Target element selector',
+      type: 'string'
+    },
+    options: {
+      description: 'Drag options',
+      type: 'object',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_file_upload - Upload file">
+Uploads files through file input elements for testing file handling functionality.
+
+**Parameters**
+<TypeTable
+  type={{
+    selector: {
+      description: 'File input selector',
+      type: 'string'
+    },
+    filePath: {
+      description: 'Path to file to upload',
+      type: 'string'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_handle_dialog - Handle browser dialogs">
+Handles browser dialogs like alerts, confirms, and prompts for comprehensive testing.
+
+**Parameters**
+<TypeTable
+  type={{
+    action: {
+      description: 'Dialog action',
+      type: '"accept"|"dismiss"'
+    },
+    text: {
+      description: 'Text for prompt dialogs',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_close - Close browser">
+Closes the current browser tab or window for session cleanup.
+
+**Parameters**
+<TypeTable
+  type={{
+    none: {
+      description: 'No parameters required',
+      type: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_tabs - Manage browser tabs">
+Manages browser tabs including creation, switching, and closing for multi-page testing.
+
+**Parameters**
+<TypeTable
+  type={{
+    action: {
+      description: 'Tab action',
+      type: '"new"|"switch"|"close"'
+    },
+    index: {
+      description: 'Tab index',
+      type: 'number',
+      default: 'null'
+    },
+    url: {
+      description: 'URL for new tab',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_resize - Resize viewport">
+Resizes the browser viewport for responsive design testing across different screen sizes.
+
+**Parameters**
+<TypeTable
+  type={{
+    width: {
+      description: 'Viewport width',
+      type: 'number'
+    },
+    height: {
+      description: 'Viewport height',
+      type: 'number'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="browser_install - Install browser extension">
+Installs browser extensions or web apps for testing with additional browser functionality.
+
+**Parameters**
+<TypeTable
+  type={{
+    type: {
+      description: 'Installation type',
+      type: '"extension"|"pwa"'
+    },
+    source: {
+      description: 'Extension or app source',
+      type: 'string'
+    }
+  }}
+/>
+</Accordion>
+</Accordions>
+
+## Postgres MCP Server
+
+The Postgres MCP server enables database introspection, query execution, and schema analysis for PostgreSQL databases.
+
+### Configuration Options
+
+<TypeTable
+  type={{
+    command: {
+      description: 'Command to run the server',
+      type: 'string',
+      default: '"npx"'
+    },
+    args: {
+      description: 'Arguments passed to the command',
+      type: 'array',
+      default: '["-y", "@modelcontextprotocol/server-postgres", "postgresql://..."]'
+    },
+    env: {
+      description: 'Environment variables for the server',
+      type: 'object',
+      default: '{"POSTGRES_CONNECTION_STRING": "..."}'
+    },
+    connectionString: {
+      description: 'PostgreSQL connection string',
+      type: 'string',
+      default: 'postgresql://username:password@host:port/database'
+    },
+    ssl: {
+      description: 'Enable SSL connection',
+      type: 'boolean',
+      default: 'false'
+    },
+    timeout: {
+      description: 'Query timeout in milliseconds',
+      type: 'number',
+      default: '30000'
+    }
+  }}
+/>
+
+### Available Tools
+
+<Accordions type="multiple">
+<Accordion title="list_tables - List database tables">
+Lists all tables in the database for exploration and planning database operations.
+
+**Parameters**
+<TypeTable
+  type={{
+    schema: {
+      description: 'Database schema',
+      type: 'string',
+      default: '"public"'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="describe_table - Get table structure">
+Provides detailed information about a table's structure including columns, constraints, and relationships.
+
+**Parameters**
+<TypeTable
+  type={{
+    tableName: {
+      description: 'Table name',
+      type: 'string'
+    },
+    schema: {
+      description: 'Database schema',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="execute_query - Run SQL query">
+Executes a SQL query and returns results for database operations and data retrieval.
+
+**Parameters**
+<TypeTable
+  type={{
+    query: {
+      description: 'SQL query string',
+      type: 'string'
+    },
+    parameters: {
+      description: 'Query parameters',
+      type: 'array',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="analyze_schema - Analyze database schema">
+Analyzes database schema for optimization opportunities and performance recommendations.
+
+**Parameters**
+<TypeTable
+  type={{
+    tableName: {
+      description: 'Specific table to analyze',
+      type: 'string',
+      default: 'null'
+    },
+    includeIndexes: {
+      description: 'Include index analysis',
+      type: 'boolean',
+      default: 'true'
+    }
+  }}
+/>
+</Accordion>
+
+<Accordion title="generate_migration - Create database migration">
+Creates a database migration script for schema changes and data transformations.
+
+**Parameters**
+<TypeTable
+  type={{
+    changes: {
+      description: 'Migration changes',
+      type: 'object'
+    },
+    direction: {
+      description: 'Migration direction',
+      type: 'string',
+      default: 'null'
+    }
+  }}
+/>
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Security Considerations">
+- Never hardcode database credentials in `.mcp.json`
+- Use environment variables for sensitive configuration
+- Limit database permissions to read-only where possible for development
+</Accordion>
+<Accordion title="Performance Optimization">
+- Configure appropriate timeouts for long-running operations
+- Use connection pooling for high-traffic scenarios
+- Cache frequently accessed schema information
+</Accordion>
+<Accordion title="Error Handling">
+- Implement retry logic for transient failures
+- Log errors for debugging while avoiding sensitive data exposure
+- Provide meaningful error messages to users
+</Accordion>
+<Accordion title="Integration with Lia">
+- Lia automatically discovers and uses available MCP tools
+- Request permission before executing destructive operations
+- Combine multiple tools for complex workflows (e.g., generate code + run tests)
+</Accordion>
+</Accordions>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Server Won't Start">
+- Check that all required packages are installed
+- Verify environment variables are set correctly
+- Ensure network connectivity for external services
+</Accordion>
+<Accordion title="Tool Execution Fails">
+- Validate input parameters match tool specifications
+- Check for permission issues (database, file system)
+- Review error logs for detailed failure information
+</Accordion>
+<Accordion title="Performance Issues">
+- Adjust timeout values for slow operations
+- Optimize queries and reduce data transfer
+- Consider caching for frequently accessed data
+</Accordion>
+</Accordions>

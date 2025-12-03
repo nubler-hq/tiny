@@ -1,0 +1,15 @@
+{
+  "title": "Account Management",
+  "description": "Guide for managing accounts, teams, notifications, and organization security.",
+  "icon": "UserGroupIcon",
+  "pages": [
+    "customizing-organization",
+    "team-management-guide",
+    "managing-profile",
+    "managing-notifications",
+    "security-access",
+    "...",
+    "---Team & Security---"
+  ],
+  "defaultOpen": true
+}

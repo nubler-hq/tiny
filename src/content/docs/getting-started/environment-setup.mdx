@@ -1,0 +1,324 @@
+---
+title: Environment Setup
+description: Configure .env for auth, billing, storage, email, and API. Includes examples and verification steps.
+---
+
+Welcome to the environment setup guide for the SaaS Boilerplate! If you're new to configuring applications, don't worry—this guide will walk you through every step in a clear, step-by-step manner. Environment variables are like secret settings that tell your application how to connect to databases, handle authentication, and integrate with external services. We'll explain what each one does, why it's important, and how to get the right values. By the end, your `.env` file will be ready, and you'll understand how everything fits together.
+
+## Why Environment Variables Matter
+
+In web development, especially with frameworks like Next.js, environment variables keep sensitive information—like passwords, API keys, and database connections—separate from your code. This is crucial for security: you never want to hardcode secrets in your source files, as they could be exposed if your code is shared or deployed publicly. Instead, you store them in a `.env` file, which is ignored by version control (like Git) and loaded only when the app runs locally or in production.
+
+The SaaS Boilerplate uses several environment variables to power features like user authentication (via Better Auth), payment processing (via Stripe), file storage, email sending, and more. If these aren't set correctly, your app might fail to start or behave unexpectedly. Let's dive into setting them up.
+
+## Before You Begin
+
+Before configuring your environment variables, make sure you have the prerequisites in place. This ensures a smooth setup process.
+
+- **Node.js 22+**: This is the runtime for your application. You can download it from the [official Node.js website](https://nodejs.org/). If you're new to Node.js, it's a JavaScript runtime that lets you run code outside a browser.
+- **Docker Desktop**: We'll use Docker to run a local PostgreSQL database. Download it from [Docker's website](https://www.docker.com/products/docker-desktop). Docker packages software into containers, making it easy to run databases locally without installing them directly on your machine.
+- **A Text Editor**: Something like VS Code, which you can get from [code.visualstudio.com](https://code.visualstudio.com/), to edit your `.env` file.
+- **Optional: Accounts for Integrations**: If you plan to use social logins (GitHub/Google), payments (Stripe), storage, or email, sign up for those services. We'll cover them in their respective sections.
+
+Once you have these, you're ready to proceed. If you haven't already, clone the repository and install dependencies as described in the [Quickstart guide](../quickstart).
+
+## Creating Your .env File
+
+The first step is to create a copy of the sample environment file provided with the boilerplate. This gives you a template with all the variables you need.
+
+<Steps>
+<Step>
+
+### Copy the Sample File
+
+In your terminal, navigate to the root of your project (where you cloned the repository) and run:
+
+```bash
+cp .env.sample .env
+```
+
+This command creates a new file called `.env` by copying `.env.sample`. The `.env` file is where you'll add your actual values. Never commit `.env` to Git—it's listed in `.gitignore` to keep your secrets safe.
+
+</Step>
+
+<Step>
+
+### Open and Edit .env
+
+Open `.env` in your text editor. You'll see a list of variables with placeholder values or comments. We'll fill them in one by one in the sections below. Save the file after each change.
+
+</Step>
+</Steps>
+
+## Core Variables
+
+These are the essential variables needed to get your app running. We'll explain each one, why it's needed, and how to set it.
+
+### Igniter Framework
+
+These variables configure the core framework settings.
+
+<TypeTable
+  type={{
+    DATABASE_URL: {
+      description: 'This tells your app how to connect to PostgreSQL. It\'s a connection string that includes the protocol, host, port, database name, and credentials. Without this, your app can\'t save or retrieve data. It\'s used by Prisma, the database toolkit in the boilerplate, to run queries. If you\'re new to databases, think of PostgreSQL as a filing cabinet where your app stores information. Docker makes it easy to "spin up" this cabinet locally without installing PostgreSQL on your computer.',
+      type: 'string',
+      default: 'postgresql://docker:docker@localhost:5432/docker?schema=public',
+    },
+    NEXT_RUNTIME: {
+      description: 'Specifies the runtime environment for Next.js. Tells Next.js which runtime to use for server-side rendering and API routes. `nodejs` is the default for standard Node.js execution.',
+      type: 'string',
+      default: 'nodejs',
+    },
+  }}
+/>
+
+For production databases, use a managed service like [Prisma Cloud](https://prisma.com/) or [Neon](https://neon.tech/). They'll give you a connection string. Always use secure credentials and enable SSL.
+
+### Application Setup
+
+These variables define your app's basic configuration.
+
+<TypeTable
+  type={{
+    NEXT_PUBLIC_IGNITER_APP_NAME: {
+      description: 'The public name of your application. This is displayed in the UI and emails. `NEXT_PUBLIC_` makes it accessible to the client-side code.',
+      type: 'string',
+      default: '"SaaS Boilerplate"',
+    },
+    NEXT_PUBLIC_IGNITER_APP_URL: {
+      description: 'The base URL where your app will be running. Used for generating links, redirects, and API calls. Must match your deployment URL.',
+      type: 'string',
+      default: 'http://localhost:3000/',
+    },
+    NEXT_PUBLIC_IGNITER_APP_BASE_PATH: {
+      description: 'The path prefix for API routes. Organizes your API under a specific path, like `/api/v1/users`. Keeps things tidy.',
+      type: 'string',
+      default: '/api/v1',
+    },
+    IGNITER_APP_SECRET: {
+      description: 'A secret key for JWT tokens and encryption. Used to sign and verify JSON Web Tokens (JWT) for authentication and sessions.',
+      type: 'string',
+      default: 'your_random_secret_key',
+    },
+    NODE_ENV: {
+      description: 'The environment your app is running in. Controls app behavior, like enabling debug logs in development or optimizations in production.',
+      type: 'string',
+      default: '"development"',
+    },
+  }}
+/>
+
+For `IGNITER_APP_SECRET`, generate a secure random string with `openssl rand -base64 32`.
+
+### Auth Providers (Optional)
+
+These enable social logins via GitHub and Google, powered by Better Auth. Learn more in the [Better Auth documentation](https://better-auth.com/docs/introduction).
+
+<TypeTable
+  type={{
+    GITHUB_CLIENT_ID: {
+      description: 'Client ID for GitHub OAuth. Allows users to log in with their GitHub accounts.',
+      type: 'string',
+    },
+    GITHUB_CLIENT_SECRET: {
+      description: 'Client secret for GitHub OAuth.',
+      type: 'string',
+    },
+    GOOGLE_CLIENT_ID: {
+      description: 'Client ID for Google OAuth. Allows users to log in with their Google accounts.',
+      type: 'string',
+    },
+    GOOGLE_CLIENT_SECRET: {
+      description: 'Client secret for Google OAuth.',
+      type: 'string',
+    },
+  }}
+/>
+
+To get GitHub credentials: Go to GitHub Settings > Developer settings > OAuth Apps. Create a new app, set the callback URL to `http://localhost:3000/api/auth/callback/github` (adjust for production). Copy the Client ID and Client Secret.
+
+For Google: Visit the [Google Cloud Console](https://console.cloud.google.com/). Create a project, enable the Google+ API, and set up OAuth 2.0 credentials. Set the redirect URI to `http://localhost:3000/api/auth/callback/google`.
+
+Better Auth supports email/password login, OTP, and these social providers. If you skip these, users can still sign up with email.
+
+### Storage Providers (Optional)
+
+For file uploads, the app can use cloud storage like AWS S3 or local alternatives like MinIO.
+
+<TypeTable
+  type={{
+    STORAGE_ENDPOINT: {
+      description: 'The endpoint URL for your storage service. Points to the storage server for uploading/downloading files.',
+      type: 'string',
+      default: 'http://localhost:9000',
+    },
+    STORAGE_ACCESS_KEY_ID: {
+      description: 'Access key ID for storage authentication.',
+      type: 'string',
+      default: 'minioadmin',
+    },
+    STORAGE_SECRET_ACCESS_KEY: {
+      description: 'Secret access key for storage authentication.',
+      type: 'string',
+      default: 'minioadmin',
+    },
+    STORAGE_REGION: {
+      description: 'The region of your storage bucket. Specifies the geographic region for AWS S3.',
+      type: 'string',
+      default: 'us-east-1',
+    },
+    STORAGE_BUCKET: {
+      description: 'The name of your storage bucket. The container for your files.',
+      type: 'string',
+      default: 'saas-boilerplate',
+    },
+  }}
+/>
+
+For AWS S3, create an IAM user with S3 permissions and generate access keys. For MinIO, use the defaults. See the [AWS S3 docs](https://docs.aws.amazon.com/s3/) for more.
+
+### Billing Providers (Optional)
+
+If your SaaS app charges users, Stripe handles payments seamlessly.
+
+<TypeTable
+  type={{
+    STRIPE_SECRET_KEY: {
+      description: 'Your Stripe secret key for server-side operations. Authenticates API calls to Stripe for creating charges, subscriptions, etc.',
+      type: 'string',
+    },
+    STRIPE_WEBHOOK_SECRET: {
+      description: 'A secret for verifying incoming webhooks from Stripe. Webhooks are notifications from Stripe (e.g., "payment succeeded"). This secret ensures they\'re authentic.',
+      type: 'string',
+    },
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: {
+      description: 'Your Stripe publishable key for client-side operations. Used in the browser for Stripe Elements (payment forms). `NEXT_PUBLIC_` exposes it safely.',
+      type: 'string',
+    },
+  }}
+/>
+
+Sign up at [stripe.com](https://stripe.com/), go to your dashboard, and find the "API keys" section. Use test keys for development. For webhooks, create an endpoint in Stripe and use the CLI for local testing: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`.
+
+For more on Stripe integration, see the [Stripe API docs](https://stripe.com/docs/api). The boilerplate includes pre-built endpoints for subscriptions and portals.
+
+### Email Providers (Optional)
+
+To send emails (e.g., for password resets or notifications), configure an email service. We recommend SMTP for development (with MailHog for testing) and Resend for production.
+
+<TypeTable
+  type={{
+    MAIL_PROVIDER: {
+      description: 'The email service provider. Use "smtp" for development (connects to MailHog by default) or "resend" for production.',
+      type: 'string',
+      default: 'smtp',
+    },
+    MAIL_SECRET: {
+      description: 'The API key or password for the email provider. For SMTP, this might be your email server credentials; for Resend, use your API key.',
+      type: 'string',
+    },
+    MAIL_FROM: {
+      description: 'The default sender address for emails. Sets the "From" field in emails.',
+      type: 'string',
+      default: '"SaaS Boilerplate <no-reply@saas-boilerplate.com.br>"',
+    },
+  }}
+/>
+
+For development, leave as SMTP to use simulate send e-mails with MailHog(https://localhost:8025). For production, switch to Resend and get your API key from [resend.com](https://resend.com/). For more on email setup and adding custom providers, see the [Email guide](../../feature-guides/email).
+
+## Setting Up and Verifying
+
+Now that you've configured the variables, let's apply them and test.
+
+<Steps>
+<Step>
+
+### Run Database Migrations
+
+With your `DATABASE_URL` set, run:
+
+```bash
+npm run db:migrate:dev
+```
+
+This uses Prisma to create tables in your database. If it fails, double-check your URL and ensure Docker/PostgreSQL is running.
+
+</Step>
+
+<Step>
+
+### Start the Development Server
+
+Launch your app:
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000` in your browser. You should see the homepage. Check `http://localhost:3000/docs` for the documentation.
+
+</Step>
+
+<Step>
+
+
+### Verify Everything Works
+
+- **Database**: Run `npm run db:studio` to open Prisma Studio (a web interface for your database). You should see tables like `user` and `session`.
+- **Auth**: Try signing up a user. If Better Auth is configured, it should work.
+- **API**: Test an endpoint, like fetching users, to ensure Igniter is responding.
+- **Optional Features**: If you set up Stripe, try a test payment. For storage, upload a file.
+
+</Step>
+</Steps>
+
+## Troubleshooting
+
+Even with careful setup, issues can arise. Here's how to fix common problems:
+
+<Accordions type="multiple">
+<Accordion title="Database connection failed">
+Ensure Docker is running and `DATABASE_URL` is correct. Run `docker ps` to check containers. If using a remote DB, verify network access and SSL settings.
+</Accordion>
+<Accordion title="Missing environment variables">
+Next.js shows errors in the console. Check your `.env` for typos—variables are case-sensitive. Restart the server after changes.
+</Accordion>
+<Accordion title="Auth not working">
+Confirm `IGNITER_APP_SECRET` is set and unique. If social logins fail, double-check provider keys in your Better Auth config (see [Better Auth providers](https://better-auth.com/docs/providers)).
+</Accordion>
+<Accordion title="Stripe errors">
+Use test keys first. In Stripe's dashboard, check logs for failed requests. For webhooks, ensure the endpoint URL matches and the secret is correct.
+</Accordion>
+<Accordion title="File uploads failing">
+Verify storage credentials and bucket permissions. Test with a small file.
+</Accordion>
+<Accordion title="Email not sending">
+Check `MAIL_PROVIDER` and `MAIL_SECRET`. Use a service like Mailtrap for testing.
+</Accordion>
+</Accordions>
+
+If you're stuck, check the console logs in your terminal or browser dev tools. The [Next.js debugging guide](https://nextjs.org/docs/advanced-features/debugging) can help.
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Security">
+Never share `.env` files. Use different secrets for dev/staging/production.
+</Accordion>
+<Accordion title="Version Control">
+`.env` is ignored by Git, but consider tools like [dotenv-vault](https://www.dotenv.org/) for team sharing.
+</Accordion>
+<Accordion title="Documentation">
+Keep notes on where you got each value, especially for production.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Quickstart](../quickstart) - Get the basics running.
+- [Running Locally](../running-locally) - Start your dev server.
+- [Authentication Guide](../../feature-guides/authentication) - Deep dive into Better Auth.
+- [Billing Guide](../../feature-guides/billing) - Integrate Stripe fully.
+- [Environment Variables Reference](../../architecture/environment-variables) - Full list with defaults.

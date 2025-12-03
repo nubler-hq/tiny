@@ -1,0 +1,250 @@
+---
+title: Roles & Permissions
+description: Learn how role-based access control (RBAC) works in the SaaS Boilerplate, including membership roles, permission validation, and organization-scoped access control.
+---
+
+By the end of this guide, you'll understand how the SaaS Boilerplate implements role-based access control, how membership roles determine user permissions within organizations, and how to enforce proper access control in your features.
+
+## Before You Begin
+
+- **Basic Knowledge**: Understanding of authentication concepts and multi-tenant architecture
+- **Prerequisites**: Familiarity with the [Authentication & Sessions](./authentication-and-sessions) and [Organizations & Tenancy](./organizations-and-tenancy) concepts
+- **Environment**: A running SaaS Boilerplate instance with user authentication configured
+
+## Core Concepts
+
+The SaaS Boilerplate implements a comprehensive role-based access control (RBAC) system that ensures users can only perform actions appropriate to their organizational role and responsibilities.
+
+### Role Hierarchy
+
+The system defines three distinct membership roles that form a clear hierarchy of permissions:
+
+- **Owner**: Full administrative control over the organization, including billing management, member administration, and organization deletion
+- **Admin**: Elevated permissions for managing organization settings, members, and most business operations, but cannot delete the organization or perform certain owner-only actions
+- **Member**: Basic access to organization resources and standard business operations, with read/write access to most features but limited administrative capabilities
+
+### Membership-Based Permissions
+
+Unlike user-level permissions, roles are organization-specific and stored in membership records:
+
+- **Organization-Scoped**: Each user can have different roles in different organizations
+- **Dynamic Assignment**: Roles can be changed by organization owners and admins
+- **Inheritance Model**: Higher-level roles (owner, admin) include all permissions of lower-level roles (member)
+- **Membership Management**: Users can be added, removed, or have their roles modified within organizations
+
+### Permission Validation
+
+The system enforces permissions through multiple layers:
+
+- **Session-Level Validation**: Role requirements checked during authentication
+- **Endpoint-Level Guards**: Controllers validate user roles before executing business logic
+- **Business Rule Enforcement**: Procedures implement role-specific business rules
+- **Data Isolation**: All queries automatically scope to the user's organization and respect role limitations
+
+## Data Models
+
+The role system is built around membership entities that link users to organizations with specific permissions.
+
+<TypeTable
+  type={{
+    OrganizationMembershipRole: {
+      description: 'Defines the three-tier role hierarchy for organization members',
+      type: "'owner' | 'admin' | 'member'",
+    },
+    Membership: {
+      description: 'Represents the relationship between a user and organization with role assignment',
+      type: 'Membership',
+    },
+    SessionWithRoles: {
+      description: 'Authenticated session that includes role validation for organization access',
+      type: 'Session<OrganizationMembershipRole[]>',
+    },
+  }}
+/>
+
+## Implementation Details
+
+Role-based access control is implemented through a layered architecture that provides both low-level validation and high-level business rule enforcement.
+
+<Steps>
+<Step>
+
+### Define Role Requirements
+
+Controllers specify required roles using the authentication context, ensuring only authorized users can access protected endpoints.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/auth/procedures/auth.procedure.ts#L265-275
+getSession: async <
+  TRequirements extends AuthRequirements | undefined = undefined,
+  TRoles extends OrganizationMembershipRole[] | undefined = undefined,
+>(
+  options?: GetSessionInput<TRequirements, TRoles>,
+): Promise<AppSession<TRequirements, TRoles>> => {
+  // Complex session retrieval with role validation logic
+  // Validates user authentication and organization membership roles
+}
+```
+
+</Step>
+
+<Step>
+
+### Implement Role Validation
+
+The authentication procedure validates that users have the required roles within their active organization before allowing access.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/auth/procedures/auth.procedure.ts#L379-387
+if (options?.roles && options.roles.length > 0 && session) {
+  if (!organization || !membership) {
+    throw new Error('NO_ORGANIZATION_ACCESS')
+  }
+
+  if (!options.roles.includes(membership.role as OrganizationMembershipRole)) {
+    throw new Error('INSUFFICIENT_PERMISSIONS')
+  }
+}
+```
+
+</Step>
+
+<Step>
+
+### Apply Role Guards in Controllers
+
+Business logic controllers use role validation to protect sensitive operations and ensure proper access control.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/membership/controllers/membership.controller.ts#L69-72
+const session = await context.auth.getSession({
+  requirements: 'authenticated',
+  roles: ['owner', 'admin'], // Only owners and admins can modify memberships
+})
+```
+
+</Step>
+
+<Step>
+
+### Enforce Business Rules
+
+Procedures implement role-specific business rules, such as preventing deletion of organization owners.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/membership/procedures/membership.procedure.ts#L245-250
+if (membership.role === 'owner')
+  throw new Error('Cannot delete organization owner')
+```
+
+</Step>
+</Steps>
+
+## Practical Examples
+
+Let's see how role-based permissions work in real business scenarios within the SaaS Boilerplate.
+
+### Membership Management with Role Validation
+
+The membership system demonstrates how roles control administrative access to organization member management.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/membership/controllers/membership.controller.ts#L120-140
+update: igniter.mutation({
+  name: 'updateMembership',
+  description: 'Update member role',
+  method: 'PUT',
+  path: '/:id' as const,
+  use: [MembershipFeatureProcedure(), AuthFeatureProcedure()],
+  body: z.object({
+    userId: z.string().optional(),
+    role: z.string().optional(),
+  }),
+  handler: async ({ request, response, context }) => {
+    // Only owners and admins can modify member roles
+    const session = await context.auth.getSession({
+      requirements: 'authenticated',
+      roles: ['owner', 'admin'],
+    })
+
+    const { id } = request.params
+    const { userId, role } = request.body
+
+    const result = await context.membership.update({
+      id,
+      userId,
+      role,
+      organizationId: session.organization.id,
+    })
+
+    return response.success(result)
+  },
+}),
+```
+
+### API Key Management with Elevated Permissions
+
+API key creation requires higher-level permissions since these keys provide programmatic access to organization resources.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/api-key/controllers/api-key.controller.ts#L172-175
+const session = await context.auth.getSession({
+  requirements: 'authenticated',
+  roles: ['owner', 'admin'], // API key management requires elevated permissions
+})
+```
+
+### Organization Statistics with Member Access
+
+Basic organization statistics are available to all members, demonstrating read access for lower-level roles.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/organization/controllers/organization.controller.ts#L140-145
+const sessionWithRoles = await context.auth.getSession({
+  requirements: 'authenticated',
+  roles: ['admin', 'member', 'owner'], // All organization members can view stats
+})
+```
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="User receives 'INSUFFICIENT_PERMISSIONS' error">
+Check the user's membership role in the organization. Verify that the endpoint's role requirements match the user's actual role. Ensure the user is accessing the correct organization and hasn't been demoted.
+
+</Accordion>
+<Accordion title="Owner cannot perform certain actions">
+Some actions may have additional business rules beyond role validation. Check for specific business logic that might restrict owner actions, such as preventing self-demotion or organization deletion under certain conditions.
+
+</Accordion>
+<Accordion title="Role changes don't take effect immediately">
+Role changes require a new session validation. The user may need to refresh their session or re-authenticate for role changes to take effect in subsequent requests.
+
+</Accordion>
+<Accordion title="User can access resources they shouldn't">
+Verify that all endpoints properly validate roles and organization context. Check that data queries are correctly scoped to the user's organization. Ensure API keys aren't bypassing role validation.
+
+</Accordion>
+<Accordion title="Cannot delete organization owner">
+This is a business rule to prevent organizations from becoming orphaned. Owners must transfer ownership to another member before leaving or demote themselves first.
+
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Role Assignment">
+Assign the minimum required role for user responsibilities. Start with 'member' role and promote only when necessary. Regularly review and adjust role assignments as team needs change.
+
+</Accordion>
+<Accordion title="Permission Design">
+Design permissions around business operations rather than technical features. Group related actions under appropriate role levels. Document role requirements for each endpoint clearly.
+
+</Accordion>
+<Accordion title="Security Auditing">
+Log all role changes and permission checks for security auditing. Implement alerts for suspicious role modification attempts. Regularly review access logs for unusual patterns.
+
+</Accordion>
+<Accordion title="User Experience">
+Provide clear feedback when users attempt actions they're not authorized for. Show role-appropriate UI elements and hide inaccessible features. Guide users on how to request role elevation when needed.
+
+</Accordion>
+<Accordion title="Business Rules">
+Implement organization-specific business rules that work with the role system. Consider organization size and type when designing permission structures. Allow organizations to customize role behaviors within boundaries.
+
+</Accordion>
+</Accordions>

@@ -1,0 +1,116 @@
+---
+title: "Managing Leads"
+description: "Learn how to manage your business contacts, add new leads, search and filter data, and export lead information in SaaS Boilerplate."
+---
+
+![Leads page showing a comprehensive table of business contacts with search and management tools.](/images/help-center/leads/01-leads-page.png)
+
+## Introduction
+
+The Leads page is your central hub for managing business contacts and potential customers. Access it via the Leads section in the dashboard sidebar. This comprehensive system helps you organize, track, and manage leads effectively. By the end of this guide, you'll know how to add leads, search data, and export information.
+
+<Callout title="Tip">Regular lead management helps maintain accurate contact information and improves business relationships.</Callout>
+
+## Prerequisites
+
+- Access to the SaaS Boilerplate dashboard
+- Permission to manage leads (Member role or higher)
+- Understanding of your lead data structure
+
+## Core Concepts
+
+### Lead Records
+Individual contact entries containing name, email, phone, and creation date.
+
+### Search and Filtering
+Real-time search functionality to find leads by name or email.
+
+### Export Functionality
+Download lead data in common formats for external analysis or backup.
+
+### Usage Limits
+Monitor lead count against your plan's limits (e.g., 2/100 used).
+
+## Step-by-Step Guide
+
+<Steps>
+<Step>
+### Access Leads Page
+Navigate to Leads in the dashboard sidebar.
+</Step>
+
+<Step>
+### Add a New Lead
+Click "Add Lead" and enter the contact's name, email, and phone number.
+</Step>
+
+<Step>
+### Search and Filter
+Use the search bar to find leads by name or email. Sort columns by clicking headers.
+</Step>
+
+<Step>
+### View Lead Details
+Click on a lead's name to see full information and manage actions.
+</Step>
+
+<Step>
+### Export Data
+Click the export button to download lead data for analysis or backup.
+</Step>
+</Steps>
+
+## Lead Table Structure
+
+<TypeTable
+  type={{
+    name: {
+      description: 'Contact name with avatar display',
+      type: 'string',
+    },
+    email: {
+      description: 'Email address for communication',
+      type: 'string',
+    },
+    phone: {
+      description: 'Phone number in international format',
+      type: 'string',
+    },
+    createdAt: {
+      description: 'Timestamp when lead was added',
+      type: 'datetime',
+    },
+    actions: {
+      description: 'View, edit, or delete options',
+      type: 'buttons',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Search not finding leads">
+Ensure you're searching by name or email exactly. Check for typos.
+</Accordion>
+<Accordion title="Export fails">
+Verify you have leads to export and try again. Contact support if persistent.
+</Accordion>
+<Accordion title="Can't add leads">
+Check your role permissions or plan limits. Upgrade if at capacity.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Keep data current">
+Regularly update lead information to maintain accuracy.
+</Accordion>
+<Accordion title="Use consistent formatting">
+Standardize name and contact formats for better organization.
+</Accordion>
+<Accordion title="Monitor usage">
+Track lead count against limits and plan upgrades as needed.
+</Accordion>
+</Accordions>

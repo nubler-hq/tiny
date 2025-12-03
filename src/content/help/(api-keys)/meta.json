@@ -1,0 +1,9 @@
+{
+  "title": "API Keys",
+  "description": "Guide for managing and using API keys in the platform.",
+  "icon": "KeyIcon",
+  "pages": [
+    "managing-api-keys"
+  ],
+  "defaultOpen": true
+}

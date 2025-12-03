@@ -1,0 +1,813 @@
+---
+title: File Storage
+description: S3-compatible file storage system with secure uploads, context-based organization, and real-time progress tracking.
+---
+
+By the end of this guide, you'll have set up a comprehensive file storage system with S3-compatible providers, secure upload handling, context-based file organization, and real-time progress tracking for your SaaS application.
+
+## Overview
+
+The SaaS Boilerplate includes a robust file storage system built on S3-compatible providers (AWS S3, MinIO, Cloudflare R2, etc.) that supports secure uploads, context-based organization, and real-time progress tracking. Key features include:
+
+- **Multi-provider support**: AWS S3, MinIO, Cloudflare R2, and other S3-compatible services
+- **Context-based organization**: Files organized by context (user, organization, public) and identifiers
+- **Secure uploads**: Direct-to-storage uploads with proper authentication and validation
+- **Real-time progress**: Upload progress tracking with state management
+- **Automatic file management**: UUID-based naming, extension handling, and cleanup operations
+- **Type-safe interfaces**: Full TypeScript support with proper error handling
+- **Hook-based frontend**: Simple React hooks for file uploads with state management
+- **Public access control**: Configurable bucket policies for public/private access
+
+The system integrates seamlessly with the authentication layer and provides both backend and frontend APIs for complete file management.
+
+## Architecture
+
+### Storage Provider System
+
+The storage system is built around the `StorageProvider` class with adapter pattern support:
+
+```typescript
+// src/@saas-boilerplate/providers/storage/storage.provider.ts
+const storageProvider = StorageProvider.initialize({
+  adapter: CompatibleS3StorageAdapter,
+  credentials: AppConfig.providers.storage,
+  contexts: ['user', 'organization', 'public'] as const,
+  onFileUploadSuccess: (file, url) => {
+    console.log(`File uploaded: ${file.name} -> ${url}`)
+  }
+})
+```
+
+### S3-Compatible Adapter
+
+The primary adapter supports all S3-compatible services with automatic bucket management:
+
+```typescript
+// src/@saas-boilerplate/providers/storage/adapters/compatible-s3-storage.adapter.ts
+export const CompatibleS3StorageAdapter = StorageProvider.adapter((options) => ({
+  upload: async (context, identifier, file) => {
+    const filename = `${randomUUID()}.${file.name.split('.').pop()}`
+    const path = `${context}/${identifier}/${filename}`
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: options.credentials.bucket,
+      Key: path,
+      Body: await convertFileToBuffer(file),
+      ContentType: file.type,
+      ACL: 'public-read'
+    }))
+    
+    return {
+      context,
+      identifier,
+      name: filename,
+      extension: file.name.split('.').pop() || '',
+      size: file.size,
+      url: `${options.credentials.endpoint}/${options.credentials.bucket}/${path}`
+    }
+  }
+}))
+```
+
+### Context-Based Organization
+
+Files are organized hierarchically by context and identifier:
+
+```
+bucket/
+├── user/
+│   ├── user-123/
+│   │   ├── abc123def.jpg
+│   │   └── def456ghi.png
+│   └── user-456/
+│       └── jkl789mno.pdf
+├── organization/
+│   ├── org-789/
+│   │   ├── logo.png
+│   │   └── banner.jpg
+│   └── org-101/
+│       └── document.pdf
+└── public/
+    ├── shared-001/
+    │   └── image.jpg
+    └── shared-002/
+        └── file.zip
+```
+
+### Upload API Route
+
+Since Igniter.js doesn't support file uploads yet, a Next.js API route handles uploads:
+
+```typescript
+// src/app/(api)/api/storage/route.tsx
+export const POST = async (request: NextRequest) => {
+  const form = await request.formData()
+  const file = form.get('file') as File
+  const context = form.get('context') as string
+  const identifier = form.get('identifier') as string
+
+  const uploadedFile = await storage.upload(context, identifier, file)
+  return NextResponse.json(uploadedFile)
+}
+```
+
+## Setting Up File Storage
+
+<Steps>
+<Step>
+### Configure Storage Provider
+
+Set up your storage provider credentials in the server configuration:
+
+```typescript
+// src/config/boilerplate.config.server.ts
+export const AppConfig = {
+  providers: {
+    storage: {
+      provider: 'S3',
+      endpoint: process.env.STORAGE_ENDPOINT,
+      region: process.env.STORAGE_REGION,
+      bucket: process.env.STORAGE_BUCKET,
+      path: process.env.STORAGE_PATH,
+      accessKeyId: process.env.STORAGE_ACCESS_KEY_ID,
+      secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY,
+    }
+  }
+}
+```
+
+For local development with MinIO:
+
+```bash
+# Environment variables
+STORAGE_ENDPOINT=http://localhost:9000
+STORAGE_ACCESS_KEY_ID=minioadmin
+STORAGE_SECRET_ACCESS_KEY=minioadmin
+STORAGE_REGION=us-east-1
+STORAGE_BUCKET=my-bucket
+```
+</Step>
+
+<Step>
+### Start MinIO for Development
+
+For local development, run MinIO using Docker:
+
+```bash
+# Using Docker
+docker run -d \
+  -p 9000:9000 -p 9001:9001 \
+  --name minio \
+  -e "MINIO_ACCESS_KEY=minioadmin" \
+  -e "MINIO_SECRET_KEY=minioadmin" \
+  -v ~/minio/data:/data \
+  quay.io/minio/minio server /data --console-address ":9001"
+
+# Access MinIO console at http://localhost:9001
+# Username: minioadmin
+# Password: minioadmin
+```
+
+Create a bucket named `my-bucket` in the MinIO console.
+</Step>
+
+<Step>
+### Initialize Storage Service
+
+The storage service is automatically initialized with your configuration:
+
+```typescript
+// src/services/storage.ts
+export const storage = StorageProvider.initialize({
+  adapter: CompatibleS3StorageAdapter,
+  credentials: AppConfig.providers.storage,
+  contexts: ['user', 'organization', 'public'] as const,
+})
+```
+
+The storage service is available in the Igniter context through the services object.
+</Step>
+
+<Step>
+### Configure Bucket Policies
+
+For public access, the adapter automatically creates bucket policies. For private buckets, configure appropriate policies in your storage provider.
+</Step>
+</Steps>
+
+## Backend Usage (Procedures & Controllers)
+
+### Direct Storage Operations
+
+Use the storage service directly in your procedures and controllers:
+
+```typescript
+// In a controller or procedure
+import { storage } from '@/services/storage'
+
+export const uploadFile = igniter.procedure({
+  handler: async ({ context, request }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated'
+    })
+
+    // Upload file directly
+    const uploadedFile = await storage.upload(
+      'user',
+      session.user.id,
+      request.file // File object from request
+    )
+
+    return response.success({
+      url: uploadedFile.url,
+      name: uploadedFile.name,
+      size: uploadedFile.size
+    })
+  }
+})
+```
+
+### File Management Operations
+
+Perform various file operations through the storage service:
+
+```typescript
+// List all files for a user
+const userFiles = await storage.list('user', userId)
+
+// Delete a specific file
+await storage.delete(fileUrl)
+
+// Remove all files for a context/identifier
+await storage.prune('organization', orgId)
+```
+
+### Integration with Business Logic
+
+Integrate file uploads with your business logic:
+
+```typescript
+// User avatar upload procedure
+export const updateUserAvatar = igniter.procedure({
+  handler: async ({ context, request }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated'
+    })
+
+    // Upload new avatar
+    const avatarFile = await storage.upload('user', session.user.id, request.file)
+
+    // Update user profile
+    await context.database.user.update({
+      where: { id: session.user.id },
+      data: { image: avatarFile.url }
+    })
+
+    // Clean up old avatar if exists
+    if (session.user.image) {
+      await storage.delete(session.user.image)
+    }
+
+    return response.success({ avatarUrl: avatarFile.url })
+  }
+})
+```
+
+## Frontend Usage (Client-side)
+
+### Using the Upload Hook
+
+The `useUpload` hook provides a simple interface for file uploads with state management:
+
+```typescript
+// src/@saas-boilerplate/hooks/use-upload.ts
+import { useUpload } from '@/@saas-boilerplate/hooks/use-upload'
+
+function FileUploader({ userId }: { userId: string }) {
+  const { upload, data: files } = useUpload({
+    context: {
+      type: 'user',
+      identifier: userId
+    },
+    onFileStateChange: (fileState) => {
+      console.log('Upload state:', fileState.state)
+      if (fileState.state === 'uploaded') {
+        console.log('File uploaded:', fileState.url)
+      }
+    }
+  })
+
+  const handleFileSelect = async (file: File) => {
+    try {
+      await upload(file)
+    } catch (error) {
+      console.error('Upload failed:', error)
+    }
+  }
+
+  return (
+    <div>
+      <input
+        type="file"
+        onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+      />
+      {files.map(file => (
+        <div key={file.name}>
+          {file.name} - {file.state}
+          {file.uploading && <span>Uploading...</span>}
+          {file.url && <img src={file.url} alt={file.name} />}
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+### Avatar Upload Component
+
+Use the `AvatarUploadInput` component for profile pictures:
+
+```typescript
+// src/components/ui/avatar-upload-input.tsx
+import { AvatarUploadInput } from '@/components/ui/avatar-upload-input'
+
+function UserProfileForm() {
+  const { session } = useAuth()
+
+  return (
+    <AvatarUploadInput
+      context="users"
+      id={session.user.id}
+      onChange={(url) => {
+        // Update user profile with new avatar URL
+        updateUserProfile({ image: url })
+      }}
+      onStateChange={async (file) => {
+        if (file.state === 'uploaded') {
+          toast.success('Avatar updated successfully!')
+        }
+      }}
+      value={session.user.image}
+      placeholder={session.user.name}
+    />
+  )
+}
+```
+
+### Custom Upload Components
+
+Build custom upload components using the hook:
+
+```typescript
+function DocumentUploader({ organizationId }: { organizationId: string }) {
+  const [uploadedFiles, setUploadedFiles] = useState<FileState[]>([])
+
+  const { upload } = useUpload({
+    context: {
+      type: 'organization',
+      identifier: organizationId
+    },
+    onFileStateChange: (fileState) => {
+      setUploadedFiles(prev => {
+        const existing = prev.find(f => f.file === fileState.file)
+        if (existing) {
+          return prev.map(f => f.file === fileState.file ? fileState : f)
+        }
+        return [...prev, fileState]
+      })
+
+      if (fileState.state === 'uploaded') {
+        // Save file metadata to database
+        saveDocumentMetadata({
+          name: fileState.name,
+          url: fileState.url,
+          size: fileState.size,
+          organizationId
+        })
+      }
+    }
+  })
+
+  const handleDrop = useCallback((files: File[]) => {
+    files.forEach(file => upload(file))
+  }, [upload])
+
+  return (
+    <div
+      onDrop={(e) => {
+        e.preventDefault()
+        handleDrop(Array.from(e.dataTransfer.files))
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      className="border-2 border-dashed p-8 text-center"
+    >
+      <p>Drop files here or click to upload</p>
+      <input
+        type="file"
+        multiple
+        onChange={(e) => e.target.files && handleDrop(Array.from(e.target.files))}
+        className="hidden"
+      />
+
+      {uploadedFiles.map(file => (
+        <div key={file.name} className="mt-2">
+          {file.name} ({file.state})
+          {file.state === 'error' && <span className="text-red-500">Failed</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+## File Storage Data Structure
+
+### StorageProviderFile
+
+<TypeTable
+  type={{
+    context: {
+      description: 'Context type (user, organization, public)',
+      type: 'string',
+      default: 'Required',
+    },
+    identifier: {
+      description: 'Unique identifier within the context',
+      type: 'string',
+      default: 'Required',
+    },
+    name: {
+      description: 'Generated filename with UUID',
+      type: 'string',
+      default: 'Auto-generated',
+    },
+    extension: {
+      description: 'File extension',
+      type: 'string',
+      default: 'From original file',
+    },
+    size: {
+      description: 'File size in bytes',
+      type: 'number',
+      default: 'From original file',
+    },
+    url: {
+      description: 'Public URL to access the file',
+      type: 'string',
+      default: 'Generated from storage path',
+    },
+  }}
+/>
+
+### Upload Hook State
+
+<TypeTable
+  type={{
+    file: {
+      description: 'Original File object',
+      type: 'File | null',
+      default: 'null',
+    },
+    name: {
+      description: 'File name',
+      type: 'string',
+      default: 'From File object',
+    },
+    extension: {
+      description: 'File extension',
+      type: 'string',
+      default: 'From File object',
+    },
+    size: {
+      description: 'File size in bytes',
+      type: 'number',
+      default: 'From File object',
+    },
+    url: {
+      description: 'Uploaded file URL',
+      type: 'string | undefined',
+      default: 'undefined until uploaded',
+    },
+    state: {
+      description: 'Current upload state',
+      type: "'idle' | 'uploading' | 'uploaded' | 'error'",
+      default: "'idle'",
+    },
+    uploading: {
+      description: 'Whether file is currently uploading',
+      type: 'boolean',
+      default: 'false',
+    },
+  }}
+/>
+
+## Practical Examples
+
+### Backend: User Avatar Management
+
+Complete avatar upload and management system:
+
+```typescript
+// User avatar controller
+export const updateAvatar = igniter.mutation({
+  use: [AuthFeatureProcedure()],
+  body: z.object({ file: z.any() }), // File will be handled by route
+  handler: async ({ context, request }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated'
+    })
+
+    // Upload new avatar
+    const avatarFile = await context.services.storage.upload(
+      'user',
+      session.user.id,
+      request.body.file
+    )
+
+    // Update user record
+    const updatedUser = await context.database.user.update({
+      where: { id: session.user.id },
+      data: { image: avatarFile.url }
+    })
+
+    // Clean up old avatar
+    if (session.user.image && session.user.image !== avatarFile.url) {
+      await context.services.storage.delete(session.user.image)
+    }
+
+    return response.success({
+      user: updatedUser,
+      avatarUrl: avatarFile.url
+    })
+  }
+})
+```
+
+### Backend: Organization Document Storage
+
+Handle document uploads for organizations:
+
+```typescript
+// Organization document upload
+export const uploadDocument = igniter.mutation({
+  use: [AuthFeatureProcedure()],
+  body: z.object({
+    file: z.any(),
+    documentType: z.enum(['contract', 'invoice', 'report'])
+  }),
+  handler: async ({ context, request }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated',
+      roles: ['admin', 'owner']
+    })
+
+    // Upload document
+    const documentFile = await context.services.storage.upload(
+      'organization',
+      session.organization.id,
+      request.body.file
+    )
+
+    // Save document metadata
+    const document = await context.database.document.create({
+      data: {
+        name: documentFile.name,
+        url: documentFile.url,
+        size: documentFile.size,
+        type: request.body.documentType,
+        organizationId: session.organization.id,
+        uploadedById: session.user.id
+      }
+    })
+
+    return response.success(document)
+  }
+})
+```
+
+### Frontend: Multi-File Upload with Progress
+
+Advanced file upload component with progress tracking:
+
+```typescript
+function MultiFileUploader({ context, identifier }: UploadProps) {
+  const [files, setFiles] = useState<FileState[]>([])
+  const { upload } = useUpload({
+    context: { type: context, identifier },
+    onFileStateChange: (fileState) => {
+      setFiles(prev => {
+        const existingIndex = prev.findIndex(f => f.file === fileState.file)
+        if (existingIndex >= 0) {
+          const updated = [...prev]
+          updated[existingIndex] = fileState
+          return updated
+        }
+        return [...prev, fileState]
+      })
+    }
+  })
+
+  const handleFilesSelected = async (selectedFiles: FileList) => {
+    const uploadPromises = Array.from(selectedFiles).map(file => upload(file))
+    await Promise.allSettled(uploadPromises)
+  }
+
+  const completedFiles = files.filter(f => f.state === 'uploaded')
+  const failedFiles = files.filter(f => f.state === 'error')
+
+  return (
+    <div className="space-y-4">
+      <input
+        type="file"
+        multiple
+        onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
+        accept="image/*,application/pdf"
+      />
+
+      <div className="space-y-2">
+        {files.map((file, index) => (
+          <div key={index} className="flex items-center space-x-2 p-2 border rounded">
+            <div className="flex-1">
+              <p className="text-sm font-medium">{file.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
+            <div className="text-sm">
+              {file.state === 'uploading' && <span className="text-blue-500">Uploading...</span>}
+              {file.state === 'uploaded' && <span className="text-green-500">✓ Complete</span>}
+              {file.state === 'error' && <span className="text-red-500">✗ Failed</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {completedFiles.length > 0 && (
+        <p className="text-green-600">
+          {completedFiles.length} files uploaded successfully
+        </p>
+      )}
+
+      {failedFiles.length > 0 && (
+        <p className="text-red-600">
+          {failedFiles.length} files failed to upload
+        </p>
+      )}
+    </div>
+  )
+}
+```
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Upload fails with network error">
+Check your storage provider credentials and endpoint configuration. Ensure the bucket exists and has proper permissions. For MinIO, verify the container is running and accessible.
+</Accordion>
+
+<Accordion title="Files not accessible after upload">
+Verify bucket policies allow public read access. Check that the ACL is set to 'public-read' during upload. Ensure the endpoint URL is correct in your configuration.
+</Accordion>
+
+<Accordion title="Upload hook not working">
+Ensure you're using the hook within a React component. Check that the context and identifier are properly set. Verify the API route at `/api/storage` is accessible.
+</Accordion>
+
+<Accordion title="File size limits exceeded">
+Check your storage provider's file size limits. For AWS S3, the default limit is 5GB for single uploads. Consider using multipart uploads for larger files.
+</Accordion>
+
+<Accordion title="CORS errors during upload">
+Configure CORS policies in your storage provider to allow uploads from your domain. For MinIO, set appropriate CORS headers in the configuration.
+</Accordion>
+
+<Accordion title="Files not persisting in development">
+Ensure MinIO data is persisted using Docker volumes. Use `docker volume create minio-data` and mount it to `/data` in the container.
+</Accordion>
+
+<Accordion title="TypeScript errors with File objects">
+File objects come from browser APIs and may need proper typing. Use `File` type from TypeScript's lib.dom.d.ts or cast appropriately.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Use appropriate contexts">
+Organize files by context (user, organization, public) for better access control and organization. Use specific identifiers for user/organization-scoped files.
+</Accordion>
+
+<Accordion title="Validate file types and sizes">
+Always validate file types and sizes before upload. Set reasonable limits based on your use case (e.g., images under 5MB, documents under 10MB).
+</Accordion>
+
+<Accordion title="Handle upload errors gracefully">
+Implement proper error handling in your upload hooks. Provide user feedback for failed uploads and allow retry functionality.
+</Accordion>
+
+<Accordion title="Clean up old files">
+Use the prune functionality to remove old files when updating avatars or documents. Implement cleanup jobs for temporary files.
+</Accordion>
+
+<Accordion title="Monitor storage usage">
+Track storage usage by context and user. Implement quotas and alerts for excessive usage. Use storage provider analytics when available.
+</Accordion>
+
+<Accordion title="Secure file access">
+Use signed URLs for private files. Implement proper access controls based on user permissions. Avoid storing sensitive data in publicly accessible files.
+</Accordion>
+
+<Accordion title="Optimize file uploads">
+Compress images before upload. Use appropriate file formats. Consider CDN integration for better performance and global distribution.
+</Accordion>
+
+<Accordion title="Backup storage data">
+Implement backup strategies for your storage buckets. Use cross-region replication for critical data. Test restore procedures regularly.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Authentication & Sessions](../authentication-and-sessions) - User context for file uploads
+- [Organizations and Tenancy](../organizations-and-tenancy) - Organization-scoped file storage
+- [Jobs & Queues](../jobs-and-queues) - Background processing for file operations
+- [Environment Variables](../../getting-started/environment-setup) - Storage configuration
+- [Deployment](../../deployment/docker) - Production storage setup
+
+## API Reference
+
+### Storage Service Methods
+
+<TypeTable
+  type={{
+    'storage.upload(context, identifier, file)': {
+      description: 'Upload a file to the specified context',
+      type: 'Promise<StorageProviderFile>',
+      default: 'Requires context, identifier, and File object',
+    },
+    'storage.list(context, identifier)': {
+      description: 'List all files in a context/identifier',
+      type: 'Promise<StorageProviderFile[]>',
+      default: 'Returns array of file metadata',
+    },
+    'storage.delete(url)': {
+      description: 'Delete a file by its URL',
+      type: 'Promise<void>',
+      default: 'Requires full file URL',
+    },
+    'storage.prune(context, identifier)': {
+      description: 'Delete all files in a context/identifier',
+      type: 'Promise<StorageProviderFile>',
+      default: 'Returns last deleted file metadata',
+    },
+  }}
+/>
+
+### Upload Hook API
+
+<TypeTable
+  type={{
+    'useUpload(options)': {
+      description: 'React hook for file uploads with state management',
+      type: '{ upload: Function, data: FileState[] }',
+      default: 'Requires context and onFileStateChange callback',
+    },
+    'upload(file)': {
+      description: 'Upload a single file',
+      type: 'Promise<void>',
+      default: 'Triggers state changes via callback',
+    },
+  }}
+/>
+
+### Storage Configuration
+
+<TypeTable
+  type={{
+    STORAGE_ENDPOINT: {
+      description: 'Storage service endpoint URL',
+      type: 'string',
+      default: 'http://localhost:9000 (MinIO)',
+    },
+    STORAGE_ACCESS_KEY_ID: {
+      description: 'Access key for authentication',
+      type: 'string',
+      default: 'Provider-specific',
+    },
+    STORAGE_SECRET_ACCESS_KEY: {
+      description: 'Secret key for authentication',
+      type: 'string',
+      default: 'Provider-specific',
+    },
+    STORAGE_REGION: {
+      description: 'Storage region/bucket location',
+      type: 'string',
+      default: 'us-east-1',
+    },
+    STORAGE_BUCKET: {
+      description: 'Bucket/container name',
+      type: 'string',
+      default: 'my-bucket',
+    },
+  }}
+/>

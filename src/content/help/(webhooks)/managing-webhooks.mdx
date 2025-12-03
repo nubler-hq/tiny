@@ -1,0 +1,132 @@
+---
+title: "Managing Webhooks"
+description: "Learn how to configure webhooks for real-time event notifications and integrate with external systems in SaaS Boilerplate."
+---
+
+![Webhooks page showing webhook configuration tools and management interface.](/images/help-center/webhooks/01-webhooks-page.jpeg)
+
+## Introduction
+
+The Webhooks page allows you to configure real-time event notifications that automatically send data to external systems when specific events occur in your SaaS Boilerplate workspace. Access it via Settings > Organization > Webhooks. This powerful feature enables seamless integrations and automations. By the end of this guide, you'll have webhooks set up to enhance your workflows.
+
+<Callout title="Tip">Webhooks enable real-time integrations, reducing manual processes and improving responsiveness.</Callout>
+
+## Prerequisites
+
+- Owner or Admin access to organization settings
+- A secure endpoint URL (HTTPS) to receive webhook payloads
+- Understanding of the events you want to monitor
+- API key or authentication method for your endpoint
+
+## Core Concepts
+
+### Webhooks
+HTTP callbacks that send data to external URLs when events happen in your workspace.
+
+### Event Types
+Categories of events that can trigger webhooks:
+- User events (created, updated, deleted, login)
+- Organization events (member changes, settings updates, plan changes)
+- Data events (lead creation, form submissions, data exports)
+- System events (integrations connected, API keys generated, maintenance)
+
+### Security
+Webhooks require secure endpoints with authentication (API keys, signatures) and HTTPS.
+
+## Step-by-Step Guide
+
+<Steps>
+<Step>
+### Access Webhooks Page
+Navigate to Settings > Organization > Webhooks in the dashboard.
+</Step>
+
+<Step>
+### Create a New Webhook
+Click "Create Webhook" and configure:
+- Name: Descriptive identifier
+- URL: Your endpoint URL
+- Events: Select which event types trigger the webhook
+- Method: HTTP method (usually POST)
+- Headers: Authentication headers if needed
+</Step>
+
+<Step>
+### Test the Webhook
+Use the test function to send a sample payload and verify your endpoint receives it correctly.
+</Step>
+
+<Step>
+### Monitor and Manage
+View webhook status, delivery logs, and success rates. Edit or delete webhooks as needed.
+</Step>
+</Steps>
+
+## Webhook Configuration Details
+
+<TypeTable
+  type={{
+    name: {
+      description: 'Descriptive name for the webhook',
+      type: 'string',
+      default: 'Required',
+    },
+    url: {
+      description: 'Secure endpoint URL to receive payloads',
+      type: 'string (HTTPS)',
+      default: 'Required',
+    },
+    events: {
+      description: 'Event types that trigger the webhook',
+      type: 'array',
+      default: 'At least one selected',
+    },
+    method: {
+      description: 'HTTP method for the request',
+      type: 'string',
+      default: 'POST',
+    },
+    headers: {
+      description: 'Custom headers including authentication',
+      type: 'object',
+      default: 'Optional',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Webhook not triggering">
+Verify event types are selected and the webhook is active. Check if the event actually occurred.
+</Accordion>
+<Accordion title="Delivery failures">
+Ensure the endpoint URL is correct, HTTPS, and accessible. Review authentication headers.
+</Accordion>
+<Accordion title="Payload format issues">
+Check your endpoint's handling of JSON payloads. Use webhook logs to inspect failed deliveries.
+</Accordion>
+<Accordion title="Rate limiting">
+Monitor delivery frequency and implement queuing if needed on your endpoint.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Use descriptive names">
+Name webhooks clearly to identify their purpose and associated systems.
+</Accordion>
+<Accordion title="Secure endpoints">
+Always use HTTPS and implement authentication to protect against unauthorized access.
+</Accordion>
+<Accordion title="Monitor health">
+Regularly check delivery logs and success rates. Set up alerts for failures.
+</Accordion>
+<Accordion title="Handle errors gracefully">
+Implement retry logic and error handling in your endpoint to manage temporary issues.
+</Accordion>
+<Accordion title="Start small">
+Begin with one or two event types, then expand as you verify reliability.
+</Accordion>
+</Accordions>

@@ -1,0 +1,270 @@
+---
+title: First Deploy
+description: Deploy to Vercel or self-host with Docker Compose, including envs and migrations.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+Welcome to deploying your SaaS Boilerplate application! If you've been developing locally and everything is working smoothly, it's time to share your app with the world. Deployment can feel daunting if you're new to it, but this guide breaks it down step by step. We'll cover two popular options: Vercel (easy and fast for Next.js apps) and self-hosting with Docker Compose (more control for custom setups). Along the way, we'll explain why each step matters, how to handle environment variables securely, and best practices to avoid common pitfalls. By the end, your app will be live, and you'll understand how to maintain it.
+
+## Why Deploy? And What to Expect
+
+Deploying takes your local code and makes it accessible online. This is crucial for testing with real users, collecting feedback, or going live. The SaaS Boilerplate is built with Next.js, so it's optimized for platforms like Vercel, but you can also run it anywhere with Docker.
+
+Expect some setup time (20-60 minutes), depending on your choice. You'll need production-ready environment variables, a database, and possibly domain setup. Always test locally first—deployment amplifies any issues.
+
+## Prerequisites
+
+Before deploying, ensure you have:
+
+- **A working local setup**: Follow the [Running Locally](../running-locally) guide. Your app should run at `http://localhost:3000` without errors.
+- **Production environment variables**: Secure versions of your `.env` values. For example, use production database URLs, live Stripe keys, and strong secrets. Never use test keys in production.
+- **A Git repository**: Push your code to GitHub, GitLab, or similar. Deployment platforms pull from Git.
+- **Optional: Domain**: For a custom URL (e.g., `myapp.com`). Buy one from providers like Namecheap or GoDaddy.
+- **Optional: Stripe/Other Services**: Set up production accounts for billing, storage, etc.
+
+If you're new to deployment, start with Vercel—it's beginner-friendly and integrates seamlessly with Next.js.
+
+## Option 1: Deploy to Vercel (Recommended for Beginners)
+
+Vercel is a platform by the creators of Next.js, offering fast deployments, automatic scaling, and built-in CI/CD. It's free for personal projects and handles much of the complexity for you. Learn more in the [Vercel documentation](https://vercel.com/docs).
+
+### Why Vercel?
+
+- **Ease**: One-click deploy from GitHub.
+- **Performance**: Optimized for Next.js with global CDN.
+- **Features**: Automatic HTTPS, previews for pull requests, and environment management.
+- **Cost**: Free tier covers most small apps; pay for heavy usage.
+
+### Steps to Deploy
+
+<Steps>
+<Step>
+
+### Prepare Your Code
+
+Ensure your code is committed and pushed to a Git repository. Vercel will build from your main branch.
+
+- Remove any hardcoded secrets from code.
+- Test locally one last time: `npm run dev` and verify features.
+
+</Step>
+
+<Step>
+
+### Connect to Vercel
+
+1. Sign up at [vercel.com](https://vercel.com/) (use GitHub for easy login).
+2. Click "New Project" and import your repository.
+3. Vercel detects Next.js automatically—confirm settings.
+
+**What happens**: Vercel clones your repo and sets up a build pipeline.
+
+</Step>
+
+<Step>
+
+### Configure Environment Variables
+
+In your Vercel project dashboard:
+
+1. Go to "Settings" > "Environment Variables".
+2. Add each variable from your `.env` (e.g., `DATABASE_URL`, `BETTER_AUTH_SECRET`).
+3. Set scopes: "Production", "Preview", "Development" as needed.
+
+**Why secure?**: Vercel encrypts these; they're not visible in logs. Use production values here—test keys could leak data.
+
+**Tip**: For sensitive vars, use Vercel's "Secret" feature or integrate with a service like [Vercel Secrets](https://vercel.com/docs/concepts/projects/environment-variables#system-environment-variables).
+
+</Step>
+
+<Step>
+
+### Set Up the Database
+
+Vercel doesn't provide databases, so use an external one:
+
+- For PostgreSQL: Use [Neon](https://neon.tech/) or [Supabase](https://supabase.com/) for serverless options.
+- Update `DATABASE_URL` with the production connection string.
+- Run migrations: In Vercel's "Functions" or via a build hook, execute `npx prisma migrate deploy`.
+
+**Why?**: Local Docker DB won't work in production. Migrations ensure your schema matches.
+
+</Step>
+
+<Step>
+
+### Deploy and Verify
+
+1. Click "Deploy" in Vercel.
+2. Watch the build logs for errors.
+3. Once live, visit the provided URL (e.g., `myapp.vercel.app`).
+4. Test: Sign up, check docs at `/docs`, verify API calls.
+
+**What to expect**: Builds take 2-5 minutes. If it fails, check logs for missing env vars or build errors.
+
+</Step>
+
+<Step>
+
+### Optional: Custom Domain
+
+In Vercel dashboard:
+
+1. Go to "Settings" > "Domains".
+2. Add your domain and follow DNS instructions.
+3. Vercel provides SSL automatically.
+
+**Why?**: Makes your app look professional. Costs ~$10-20/year for a domain.
+
+</Step>
+</Steps>
+
+### Vercel Troubleshooting
+
+- **Build fails**: Check for TypeScript errors (`npm run typecheck`). Ensure Node.js version matches (22+).
+- **Env vars missing**: Redeploy after adding them. Use "Redeploy" button.
+- **Database issues**: Confirm URL and run migrations manually via Vercel CLI (`vercel env pull` then `npx prisma migrate deploy`).
+- **Slow loads**: Enable Vercel's analytics or check for large bundles.
+
+## Option 2: Self-Host with Docker Compose
+
+For more control, deploy to a VPS (like DigitalOcean) or your own server using Docker Compose. This is ideal if you need custom infrastructure or avoid vendor lock-in.
+
+### Why Docker Compose?
+
+- **Control**: Run on any server with Docker.
+- **Cost**: Cheaper for high traffic; use free tiers or pay per server.
+- **Flexibility**: Add services like monitoring or load balancers.
+
+### Prerequisites for Self-Hosting
+
+- A server (e.g., Ubuntu VPS from DigitalOcean, ~$5/month).
+- Docker and Docker Compose installed on the server.
+- SSH access and basic Linux knowledge.
+
+### Steps to Deploy
+
+<Steps>
+<Step>
+
+### Prepare Your Server
+
+1. Provision a VPS and install Docker: Follow [DigitalOcean's Docker guide](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-20-04).
+2. Clone your repo: `git clone https://github.com/yourusername/yourrepo.git`.
+3. Set up environment: Copy `.env` and update with production values (secure DB URL, etc.).
+
+**Security tip**: Use SSH keys, not passwords. Install fail2ban for protection.
+
+</Step>
+
+<Step>
+
+### Configure Docker Compose for Production
+
+Edit `docker-compose.yml` (or create a `docker-compose.prod.yml`):
+
+- Add your app service: Build from Dockerfile, expose port 3000.
+- Use production DB (e.g., external PostgreSQL).
+- Add reverse proxy (e.g., Nginx) for SSL.
+
+Example snippet:
+
+```yaml
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+```
+
+**Why?**: This defines how to run your app in containers.
+
+</Step>
+
+<Step>
+
+### Run Migrations and Build
+
+On the server:
+
+1. `docker-compose up -d db` (start DB).
+2. `npx prisma migrate deploy` (apply schema).
+3. `docker-compose up -d` (start app).
+
+**What happens**: Containers build and run. App compiles and serves.
+
+</Step>
+
+<Step>
+
+### Set Up SSL and Domain
+
+1. Use Certbot for free SSL: `sudo certbot --nginx` (if using Nginx).
+2. Point domain DNS to your server's IP.
+3. Configure firewall: Allow ports 80/443, block others.
+
+**Why secure?**: HTTPS encrypts traffic; domains build trust.
+
+</Step>
+
+<Step>
+
+### Monitor and Maintain
+
+- Use tools like PM2 or Docker logs for monitoring.
+- Set up backups for the DB.
+- Update regularly: Pull code changes, rebuild containers.
+
+**Best practice**: Automate with CI/CD (e.g., GitHub Actions to deploy on push).
+
+</Step>
+</Steps>
+
+### Docker Troubleshooting
+
+- **Containers won't start**: Check logs with `docker-compose logs`. Ensure ports aren't conflicting.
+- **App crashes**: Verify env vars and DB connection. Use `docker exec` to debug inside containers.
+- **Performance**: Monitor CPU/memory; scale with more servers if needed.
+- **Security**: Keep Docker updated; use secrets for sensitive data.
+
+## General Best Practices for Deployment
+
+- **Environment Separation**: Use different env vars for dev/staging/prod. Test on staging first.
+- **Secrets Management**: Never commit secrets. Use tools like [Doppler](https://www.doppler.com/) or AWS Secrets Manager.
+- **Monitoring**: Set up logging (e.g., Vercel Analytics) and error tracking (e.g., Sentry).
+- **Backups**: Regularly back up your DB to avoid data loss.
+- **Scaling**: Start small; monitor usage and upgrade as needed.
+- **Documentation**: Note your setup for future maintenance.
+
+## Verifying Your Deployment
+
+After deploying:
+
+- **Accessibility**: App loads at your domain.
+- **Features work**: Test auth, payments, uploads.
+- **Performance**: Use tools like [Lighthouse](https://developers.google.com/web/tools/lighthouse) for scores.
+- **Security**: Check for HTTPS and no exposed secrets.
+
+If issues arise, compare with local setup and check logs.
+
+## Next Steps
+
+Once deployed, focus on user acquisition, feature development, or scaling. If you encounter issues, the community or docs can help.
+
+## See Also
+
+- [Running Locally](../running-locally) - Ensure local setup works.
+- [Environment Setup](../environment-setup) - Secure your variables.
+- [Vercel Deployment](../../deployment/vercel) - Deep dive into Vercel.
+- [Docker Deployment](../../deployment/docker) - Advanced Docker tips.
+- [Database Migrations](../../deployment/database-migrations) - Handling schema changes.
+- [Secrets Management](../../deployment/secrets-management) - Best practices for security.

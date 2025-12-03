@@ -1,0 +1,834 @@
+---
+title: Billing
+description: Subscription billing system with Stripe integration, plans, checkout, and webhooks.
+---
+
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+By the end of this guide, you'll understand how to implement a complete subscription billing system using Stripe integration. You'll learn to configure payment providers, manage subscription plans, handle checkout sessions, process webhooks, and integrate billing data into user sessions for a seamless SaaS experience.
+
+## Overview
+
+The SaaS Boilerplate includes a comprehensive billing system built around Stripe's payment infrastructure. It provides:
+
+- **Multi-tenant subscriptions**: Organization-scoped billing with role-based access
+- **Flexible pricing**: Support for multiple plans, billing cycles, and currencies
+- **Usage tracking**: Real-time quota monitoring and feature limits
+- **Self-service portal**: Customer portal for subscription management
+- **Webhook processing**: Automated handling of payment events and subscription changes
+- **Trial management**: Configurable trial periods with automatic conversion
+- **Optional payment provider**: Run without Stripe for non-paid SaaS applications
+
+The system integrates deeply with authentication, automatically including billing information in user sessions for seamless access control and feature gating.
+
+## Optional Payment Provider
+
+The billing system supports running without a payment provider, making it perfect for non-paid SaaS applications, MVPs, or development environments.
+
+### When Payment is Disabled
+
+When Stripe environment variables are not configured, the application automatically:
+
+- **Hides billing UI components**: Pricing pages, upgrade buttons, and billing settings are hidden or show placeholders
+- **Grants full access**: All users have unrestricted access without subscription requirements
+- **Skips payment operations**: Billing APIs return appropriate errors or null values
+- **Maintains functionality**: Core features work normally without payment dependencies
+
+### Configuration
+
+#### Enable Payment Provider
+
+To enable Stripe integration, set all required environment variables:
+
+```bash
+# Required for payment functionality
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+```
+
+#### Disable Payment Provider
+
+To run without payment features, simply leave the Stripe variables empty or remove them:
+
+```bash
+# Leave empty to disable payment
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+```
+
+### Migration Between Modes
+
+#### From No Payment to Payment Enabled
+
+1. Obtain Stripe API keys from your Stripe dashboard
+2. Add the environment variables to your `.env` file
+3. Restart the application
+4. The system will automatically sync plans and enable billing features
+5. Existing organizations may need manual customer creation in Stripe
+
+#### From Payment Enabled to No Payment
+
+1. Remove or clear the Stripe environment variables
+2. Restart the application
+3. Billing features are automatically hidden
+4. All users gain unrestricted access
+5. Existing billing data remains in the database but is not accessed
+
+### Development Benefits
+
+Running without payment provider is ideal for:
+
+- **Rapid prototyping**: Build and test features without payment setup
+- **MVP development**: Launch without monetization initially
+- **Team collaboration**: Developers can work without Stripe accounts
+- **CI/CD testing**: Automated tests run without payment dependencies
+
+### Technical Implementation
+
+The system automatically detects payment provider status using a client-side utility:
+
+```typescript
+// Frontend detection
+import { isPaymentEnabled } from '@/@saas-boilerplate/features/billing/presentation/utils/is-payment-enabled'
+
+if (!isPaymentEnabled()) {
+  // Hide billing components
+  return null
+}
+```
+
+Backend procedures check payment status before executing billing operations:
+
+```typescript
+// Backend validation
+if (!isPaymentEnabled()) {
+  // Return null or appropriate error
+  return null
+}
+```
+
+## Architecture
+
+### Payment Provider
+
+The core of the billing system is the `PaymentProvider` class, which orchestrates all payment operations:
+
+```typescript
+// src/@saas-boilerplate/providers/payment/payment.provider.ts
+class PaymentProvider<TPlans extends PlanDTO[]> {
+  private adapter: StripeAdapter
+  private database: PrismaAdapter
+  private events: PaymentEvents
+  
+  // Core methods for subscription lifecycle
+  async createSubscription(params: CreateSubscriptionParams)
+  async updateSubscription(params: UpdateSubscriptionParams) 
+  async cancelSubscription(subscriptionId: string)
+  async createCheckoutSession(params: CheckoutSessionParams)
+  async createBillingPortal(customerId: string)
+  async handle(request: Request) // Webhook processing
+}
+```
+
+### Service Configuration
+
+The payment service is initialized with Stripe credentials and configuration:
+
+```typescript
+// src/services/payment.ts
+export const payment = PaymentProvider.initialize({
+  database: prismaAdapter(prisma),
+  adapter: stripeAdapter({
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  }),
+  paths: {
+    checkoutCancelUrl: `${baseUrl}/billing/cancel`,
+    checkoutSuccessUrl: `${baseUrl}/billing/success`,
+    portalReturnUrl: `${baseUrl}/settings/billing`,
+  },
+  subscriptions: {
+    enabled: true,
+    trial: { enabled: true, duration: 14 },
+    plans: {
+      default: 'free',
+      options: [
+        { slug: 'free', name: 'Free', prices: [...] },
+        { slug: 'pro', name: 'Pro', prices: [...] },
+      ]
+    }
+  }
+})
+```
+
+### Context Integration
+
+The payment service is automatically available in the Igniter context, so you can use it directly in procedures and controllers without importing:
+
+```typescript
+// Available in any procedure or controller
+const canUse = await context.services.payment.canUseFeature({
+  customerId: organizationId,
+  feature: 'api_calls',
+  quantity: 1
+})
+```
+
+## Setting Up Billing
+
+## Setting Up Billing
+
+<Steps>
+<Step>
+### Configure Stripe (Optional)
+
+The payment provider is completely optional. For non-paid applications, you can skip this step entirely.
+
+To enable Stripe integration, set up your Stripe account and obtain API keys:
+
+```bash
+# Add to .env (leave empty to disable payment features)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+```
+
+Create products and prices in your Stripe dashboard, then map them in your configuration.
+
+**Note**: If you leave these variables empty, the application will run with all billing features disabled, granting full access to all users.
+</Step>
+
+<Step>
+### Initialize Payment Service
+
+Configure the payment provider with your Stripe credentials and plan definitions:
+
+```typescript
+// src/services/payment.ts
+const { keys, paths, subscription } = AppConfig.providers.billing
+
+export const payment = PaymentProvider.initialize({
+  database: prismaAdapter(prisma),
+  adapter: stripeAdapter(keys),
+  paths,
+  subscriptions: {
+    enabled: subscription.enabled,
+    trial: subscription.trial,
+    plans: subscription.plans,
+  },
+})
+```
+</Step>
+
+<Step>
+### Set Up Webhooks
+
+Configure Stripe webhooks to sync subscription changes:
+
+```bash
+# Start local webhook forwarding
+npm run stripe:webhook
+
+# Copy the webhook secret to .env
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+The webhook endpoint automatically handles events like `customer.created`, `invoice.paid`, and `customer.subscription.updated`.
+</Step>
+
+<Step>
+### Integrate with Authentication
+
+Billing data is automatically included in user sessions:
+
+```typescript
+// Session includes billing information
+const session = await context.auth.getSession({
+  requirements: 'authenticated',
+  roles: ['admin', 'owner']
+})
+
+// Access billing data
+const { customer, subscription } = session.organization.billing
+```
+</Step>
+</Steps>
+
+## Subscription Plans
+
+### Plan Structure
+
+Plans are defined with features, pricing, and limits:
+
+```typescript
+interface Plan {
+  slug: string
+  name: string
+  description: string
+  metadata: {
+    features: Array<{
+      slug: string
+      name: string
+      enabled: boolean
+      limit?: number
+      cycle?: 'month' | 'year'
+    }>
+  }
+  prices: Array<{
+    amount: number
+    currency: string
+    interval: 'month' | 'year'
+  }>
+}
+```
+
+### Managing Plans
+
+Use the Plan controller to retrieve available plans:
+
+```typescript
+// Get all subscription plans
+const plans = await api.plan.findMany.query()
+
+// Each plan includes pricing and features
+plans.forEach(plan => {
+  console.log(`${plan.name}: $${plan.price.amount}/${plan.price.interval}`)
+})
+```
+
+## Backend Usage (Procedures & Controllers)
+
+### Feature Gating
+
+Use billing data to control feature access in your backend logic. When payment is disabled, all users have unrestricted access:
+
+```typescript
+// In a procedure or controller
+const session = await context.auth.getSession({
+  requirements: 'authenticated'
+})
+
+// When payment is disabled, billing is null and users have full access
+if (!session.organization?.billing?.subscription) {
+  // Payment disabled: allow full access
+  // Payment enabled: check subscription requirements
+  if (isPaymentEnabled()) {
+    throw new Error('Subscription required')
+  }
+}
+
+// Check feature limits (only when payment is enabled)
+if (isPaymentEnabled()) {
+  const canUseApi = await context.services.payment.canUseFeature({
+    customerId: session.organization.id,
+    feature: 'api_calls',
+    quantity: 1
+  })
+
+  if (!canUseApi) {
+    throw new Error('API limit exceeded')
+  }
+}
+```
+
+### Subscription Management
+
+Handle subscription operations in your backend:
+
+```typescript
+// Check quota before allowing action
+const usage = await context.services.payment.getQuotaInfo({
+  customerId: organizationId,
+  feature: 'storage'
+})
+
+if (usage.usage >= usage.limit) {
+  throw new Error('Storage limit exceeded')
+}
+
+// Process subscription changes
+const subscription = await context.services.payment.updateSubscription({
+  subscriptionId: 'sub_123',
+  planId: 'pro_plan'
+})
+```
+
+## Frontend Usage (Client-side)
+
+Billing components automatically hide when payment is disabled. Use the `isPaymentEnabled()` utility to conditionally render billing features:
+
+### Creating Checkout Sessions
+
+Generate secure payment links for subscriptions (only when payment is enabled):
+
+```typescript
+// Only show checkout when payment is enabled
+if (!isPaymentEnabled()) {
+  return <div>Payment features are not available</div>
+}
+
+// Create checkout session for new subscription
+const checkout = await api.billing.createCheckoutSession.mutate({
+  plan: 'pro',
+  cycle: 'month'
+})
+
+// Redirect to Stripe checkout
+window.location.href = checkout.data.url
+```
+
+### Customer Portal
+
+Allow customers to manage their own subscriptions:
+
+```typescript
+// Create portal session
+const portal = await api.billing.createSessionManager.mutate({
+  returnUrl: window.location.href
+})
+
+// Redirect to customer portal
+window.location.href = portal.data.url
+```
+
+### Billing Information
+
+Retrieve complete billing information for organizations:
+
+```typescript
+// Get full billing details
+const billing = await api.billing.getSessionCustomer.query()
+
+// Access all billing data
+const {
+  customer,
+  subscription,
+  paymentMethods,
+  invoices
+} = billing.data
+```
+
+## Billing Information
+
+### Comprehensive Billing Data
+
+Retrieve complete billing information for organizations:
+
+```typescript
+// Get full billing details
+const billing = await api.billing.getSessionCustomer.query()
+
+// Access all billing data
+const {
+  customer,
+  subscription,
+  paymentMethods,
+  invoices
+} = billing.data
+```
+
+### Billing Info Structure
+
+<TypeTable
+  type={{
+    customer: {
+      description: 'Customer contact and account information',
+      type: 'Customer',
+      default: 'Required',
+    },
+    subscription: {
+      description: 'Current subscription with plan and usage',
+      type: 'Subscription',
+      default: 'Optional',
+    },
+    paymentMethods: {
+      description: 'Available payment methods',
+      type: 'PaymentMethod[]',
+      default: 'Optional',
+    },
+    invoices: {
+      description: 'Recent invoice history',
+      type: 'Invoice[]',
+      default: 'Optional',
+    },
+  }}
+/>
+
+## Webhooks & Events
+
+### Webhook Processing
+
+The webhook endpoint automatically processes Stripe events:
+
+```typescript
+// src/app/(api)/api/billing/webhook/route.ts
+export const POST = async (request: Request) => {
+  const event = await payment.handle(request)
+  return new Response(JSON.stringify(event), { status: 200 })
+}
+```
+
+### Supported Events
+
+<Accordions type="multiple">
+<Accordion title="customer.created">
+Creates customer record in database when new customer is added in Stripe.
+</Accordion>
+
+<Accordion title="checkout.session.completed">
+Processes successful checkout, creates/updates subscription.
+</Accordion>
+
+<Accordion title="invoice.paid">
+Updates subscription status, records payment.
+</Accordion>
+
+<Accordion title="customer.subscription.updated">
+Syncs subscription changes (upgrades, downgrades, pauses).
+</Accordion>
+
+<Accordion title="customer.subscription.deleted">
+Handles subscription cancellations.
+</Accordion>
+
+<Accordion title="invoice.payment_failed">
+Manages failed payments and dunning processes.
+</Accordion>
+</Accordions>
+
+## Usage Tracking & Quotas
+
+### Feature Limits
+
+Track usage against plan limits:
+
+```typescript
+// Check if user can use a feature (Backend)
+const canUse = await context.services.payment.canUseFeature({
+  customerId: organizationId,
+  feature: 'api_calls',
+  quantity: 1
+})
+
+// Get current usage info (Backend)
+const usage = await context.services.payment.getQuotaInfo({
+  customerId: organizationId,
+  feature: 'api_calls'
+})
+```
+
+### Usage Structure
+
+<TypeTable
+  type={{
+    slug: {
+      description: 'Feature identifier',
+      type: 'string',
+      default: 'Required',
+    },
+    usage: {
+      description: 'Current usage count',
+      type: 'number',
+      default: '0',
+    },
+    limit: {
+      description: 'Maximum allowed usage',
+      type: 'number',
+      default: 'Required',
+    },
+    cycle: {
+      description: 'Reset cycle period',
+      type: 'month | year',
+      default: 'month',
+    },
+    nextReset: {
+      description: 'When usage resets',
+      type: 'Date',
+      default: 'Calculated',
+    },
+  }}
+/>
+
+## Session Integration
+
+### Billing in Auth Sessions
+
+Billing data is automatically included in authenticated sessions:
+
+```typescript
+// Get session with billing data
+const session = await context.auth.getSession({
+  requirements: 'authenticated',
+  roles: ['admin', 'owner']
+})
+
+// Access billing information
+if (session.organization?.billing) {
+  const { customer, subscription } = session.organization.billing
+  
+  // Check subscription status
+  if (subscription?.status === 'active') {
+    // User has active subscription
+  }
+}
+```
+
+### Session Billing Types
+
+<TypeTable
+  type={{
+    customer: {
+      description: 'Stripe customer information',
+      type: 'Customer',
+      default: 'Available when customer exists',
+    },
+    subscription: {
+      description: 'Current subscription details',
+      type: 'Subscription | null',
+      default: 'null if no active subscription',
+    },
+    'subscription.status': {
+      description: 'Subscription status',
+      type: 'active | past_due | canceled | etc.',
+      default: 'Varies',
+    },
+    'subscription.plan': {
+      description: 'Current plan with features',
+      type: 'Plan',
+      default: 'Required',
+    },
+    'subscription.usage': {
+      description: 'Current feature usage',
+      type: 'Usage[]',
+      default: 'Empty array if no usage',
+    },
+  }}
+/>
+
+## Practical Examples
+
+### Backend: Feature Gating
+
+Use billing data to control feature access in your backend logic:
+
+```typescript
+// In a procedure or controller
+const session = await context.auth.getSession({
+  requirements: 'authenticated'
+})
+
+if (!session.organization?.billing?.subscription) {
+  throw new Error('Subscription required')
+}
+
+// Check feature limits
+const canUseApi = await context.services.payment.canUseFeature({
+  customerId: session.organization.id,
+  feature: 'api_calls',
+  quantity: 1
+})
+
+if (!canUseApi) {
+  throw new Error('API limit exceeded')
+}
+```
+
+### Frontend: Subscription Management UI
+
+Build a billing dashboard:
+
+```typescript
+// Get billing data for dashboard
+const billing = await api.billing.getSessionCustomer.query()
+
+// Display subscription info
+const { subscription, customer, paymentMethods } = billing.data
+
+// Show current plan
+console.log(`Plan: ${subscription.plan.name}`)
+console.log(`Status: ${subscription.status}`)
+
+// Show usage
+subscription.usage.forEach(feature => {
+  console.log(`${feature.name}: ${feature.usage}/${feature.limit}`)
+})
+```
+
+### Backend: Webhook Event Handling
+
+Extend webhook processing for custom logic:
+
+```typescript
+// In webhook handler
+const event = await payment.handle(request)
+
+// Custom processing based on event type
+switch (event.type) {
+  case 'customer.subscription.updated':
+    // Handle subscription changes
+    await handleSubscriptionUpdate(event.data)
+    break
+    
+  case 'invoice.payment_failed':
+    // Handle failed payments
+    await handlePaymentFailure(event.data)
+    break
+}
+```
+
+## Testing
+
+### Test Cards
+
+Use Stripe test card numbers for development:
+
+```
+4242 4242 4242 4242  # Success
+4000 0000 0000 0002  # Declined
+4000 0025 0000 3155  # Insufficient funds
+```
+
+### Webhook Testing
+
+Test webhooks locally:
+
+```bash
+# Forward webhooks to local server
+stripe listen --forward-to localhost:3000/api/billing/webhook
+
+# Trigger test events
+stripe trigger checkout.session.completed
+stripe trigger invoice.payment_succeeded
+```
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Webhook signature verification fails">
+Ensure `STRIPE_WEBHOOK_SECRET` matches the secret from your Stripe dashboard. Re-run `stripe listen` to get a fresh secret.
+</Accordion>
+
+<Accordion title="Subscription not syncing">
+Check webhook delivery in Stripe dashboard. Ensure the webhook endpoint is publicly accessible and returns 200 status.
+</Accordion>
+
+<Accordion title="Checkout session creation fails">
+Verify plan slugs match your configuration. Check Stripe product/price IDs are correct and active.
+</Accordion>
+
+<Accordion title="Customer portal not working">
+Ensure billing portal is enabled in Stripe dashboard. Check `portalReturnUrl` is a valid URL.
+</Accordion>
+
+<Accordion title="Usage limits not working">
+Verify feature slugs match between your code and Stripe metadata. Check quota calculations.
+</Accordion>
+
+<Accordion title="Session billing data missing">
+Ensure user has an active organization. Check that Stripe customer exists for the organization ID.
+</Accordion>
+
+<Accordion title="Payment features not showing when enabled">
+Verify all three Stripe environment variables are set. Check that `isPaymentEnabled()` returns true in the browser console.
+</Accordion>
+
+<Accordion title="Full access when payment should be enabled">
+Ensure Stripe keys are properly configured. Check server logs for payment service initialization errors.
+</Accordion>
+
+<Accordion title="Billing components showing when payment disabled">
+Verify that components use `isPaymentEnabled()` check. Clear browser cache and restart development server.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Handle webhook idempotency">
+Store event IDs to prevent duplicate processing. Use Stripe's idempotency keys for retries.
+</Accordion>
+
+<Accordion title="Test thoroughly">
+Use Stripe's test mode extensively. Test all subscription states and edge cases.
+</Accordion>
+
+<Accordion title="Monitor usage">
+Implement alerts for high usage. Track subscription metrics and churn indicators.
+</Accordion>
+
+<Accordion title="Secure webhooks">
+Validate webhook signatures. Use HTTPS. Don't expose webhook secrets in client code.
+</Accordion>
+
+<Accordion title="Handle failures gracefully">
+Implement retry logic for failed payments. Provide clear error messages to users.
+</Accordion>
+
+<Accordion title="Plan for scale">
+Design for multiple currencies and regions. Consider tax implications.
+</Accordion>
+
+<Accordion title="Use payment-optional mode for development">
+Disable payment provider during initial development and testing. Enable only when ready to implement monetization. This speeds up development and simplifies testing.
+</Accordion>
+</Accordions>
+
+## See Also
+
+- [Setup Stripe](../../deployment/setup-stripe) - Complete Stripe configuration guide
+- [Authentication & Sessions](../authentication-and-sessions) - How billing integrates with auth
+- [Organizations and Tenancy](../organizations-and-tenancy) - Multi-tenant billing architecture
+- [Jobs & Queues](../jobs-and-queues) - Background processing for billing operations
+- [API Keys](../api-keys) - Programmatic access to billing endpoints
+
+## API Reference
+
+### Billing Endpoints
+
+<TypeTable
+  type={{
+    'GET /billing/subscription': {
+      description: 'Get comprehensive billing information',
+      type: 'BillingInfo',
+      default: 'Requires auth',
+    },
+    'POST /billing/subscription': {
+      description: 'Create checkout session',
+      type: 'CheckoutSession',
+      default: 'Requires auth',
+    },
+    'POST /billing/subscription/open': {
+      description: 'Create customer portal session',
+      type: 'SessionManager',
+      default: 'Requires auth',
+    },
+  }}
+/>
+
+### Plan Endpoints
+
+<TypeTable
+  type={{
+    'GET /plan': {
+      description: 'List all subscription plans',
+      type: 'Plan[]',
+      default: 'Public',
+    },
+  }}
+/>
+
+### Webhook Events
+
+<TypeTable
+  type={{
+    'POST /api/billing/webhook': {
+      description: 'Stripe webhook endpoint',
+      type: 'Event processing',
+      default: 'Public',
+    },
+  }}
+/>

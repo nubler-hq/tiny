@@ -1,0 +1,124 @@
+---
+title: "Managing Submissions"
+description: "Learn how to manage form submissions, share forms, export data, and track user interactions in SaaS Boilerplate."
+---
+
+![Submissions page showing form submission management tools and empty state.](/images/help-center/submissions/01-submissions-page.png)
+
+## Introduction
+
+The Submissions page is your central hub for tracking and managing form submissions from your business forms and contact pages. Access it via the Submissions section in the dashboard sidebar. This system provides tools for sharing forms, tracking submissions, and exporting data for analysis. By the end of this guide, you'll know how to handle submissions effectively.
+
+<Callout title="Tip">Regular submission management helps improve user engagement and data quality.</Callout>
+
+## Prerequisites
+
+- Access to the SaaS Boilerplate dashboard
+- Permission to manage submissions (Member role or higher)
+- Forms set up to collect submissions
+
+## Core Concepts
+
+### Form Submissions
+Individual responses from users who fill out your forms, containing data like name, email, and custom fields.
+
+### Sharing Forms
+Generate shareable links to distribute forms via email, social media, or websites.
+
+### Export Functionality
+Download submission data in common formats for external analysis or backup.
+
+### Usage Limits
+Monitor submission count against your plan's limits (e.g., 0/1000 used).
+
+## Step-by-Step Guide
+
+<Steps>
+<Step>
+### Access Submissions Page
+Navigate to Submissions in the dashboard sidebar.
+</Step>
+
+<Step>
+### Share a Form
+Click "Share Form" to generate a shareable link and distribute it through your preferred channels.
+</Step>
+
+<Step>
+### Monitor Submissions
+View incoming submissions in the table, including name, email, form type, and submission date.
+</Step>
+
+<Step>
+### Search and Filter
+Use the search bar to find submissions by name or email. Sort columns as needed.
+</Step>
+
+<Step>
+### Export Data
+Click the export button to download submission data for analysis or backup.
+</Step>
+</Steps>
+
+## Submission Table Structure
+
+<TypeTable
+  type={{
+    name: {
+      description: 'Submitter name',
+      type: 'string',
+    },
+    email: {
+      description: 'Contact email',
+      type: 'string',
+    },
+    phone: {
+      description: 'Phone number if provided',
+      type: 'string',
+    },
+    formType: {
+      description: 'Which form was submitted',
+      type: 'string',
+    },
+    submissionDate: {
+      description: 'When the submission was made',
+      type: 'datetime',
+    },
+    status: {
+      description: 'Current processing status',
+      type: 'string',
+    },
+    actions: {
+      description: 'View details, process, or follow up',
+      type: 'buttons',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="No submissions showing">
+Ensure forms are published and shared. Check if submissions are being received.
+</Accordion>
+<Accordion title="Export fails">
+Verify you have submissions to export and try again. Contact support if issues persist.
+</Accordion>
+<Accordion title="Share link not working">
+Regenerate the link and ensure it's distributed correctly.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Design clear forms">
+Use essential fields only and optimize for mobile devices.
+</Accordion>
+<Accordion title="Follow up promptly">
+Respond to submissions quickly to improve engagement.
+</Accordion>
+<Accordion title="Maintain data quality">
+Validate fields and review submissions regularly.
+</Accordion>
+</Accordions>

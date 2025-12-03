@@ -1,0 +1,10 @@
+{
+  "title": "Integrations",
+  "description": "Learn how to connect and manage integrations with external platforms.",
+  "icon": "PlugIcon",
+  "pages": [
+    "managing-integrations",
+    "connecting-mcp-assistants"
+  ],
+  "defaultOpen": true
+}

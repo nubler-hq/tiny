@@ -1,0 +1,27 @@
+{
+  "title": "Development",
+  "description": "Foundational ideas: multi-tenancy, auth, roles, controllers, jobs, plugins, content.",
+  "defaultOpen": false,
+  "icon": "Code",
+  "pages": [
+    "organizations-and-tenancy",
+    "authentication-and-sessions",
+    "roles-and-permissions",
+    "controllers-and-procedures",
+    "jobs-and-queues",
+    "plugin-manager",
+    "content-layer",
+    "built-in-mcp-server",
+    "authentication",
+    "billing",
+    "notifications",
+    "file-storage",
+    "email",
+    "webhooks",
+    "api-keys",
+    "seo",
+    "data-fetching",
+    "design-system"
+  ]
+}
+

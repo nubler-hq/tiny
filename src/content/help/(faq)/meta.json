@@ -1,0 +1,9 @@
+{
+  "title": "FAQ",
+  "description": "Frequently asked questions about platform usage, features, and support.",
+  "icon": "HelpCircle",
+  "pages": [
+    "frequently-asked-questions"
+  ],
+  "defaultOpen": true
+}

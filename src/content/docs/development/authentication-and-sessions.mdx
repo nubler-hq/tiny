@@ -1,0 +1,443 @@
+---
+title: Authentication & Sessions
+description: Learn how the SaaS Boilerplate handles user authentication, session management, and organization-based access control using Better Auth.
+---
+
+By the end of this guide, you'll understand how authentication works in the SaaS Boilerplate, how sessions manage user state and organization context, and how to implement secure access control in your features.
+
+## Before You Begin
+
+- **Basic Knowledge**: Familiarity with web authentication concepts and TypeScript
+- **Environment Setup**: A running instance with Better Auth configured (see [Environment Setup](../../getting-started/environment-setup))
+- **Database**: PostgreSQL with migrations applied
+- **Optional**: OAuth provider credentials for social login
+
+## Core Concepts
+
+The SaaS Boilerplate uses Better Auth as its authentication foundation, enhanced with organization management and multi-tenant access control. This creates a robust system where users can authenticate, manage multiple organizations, and access resources securely.
+
+### Authentication Methods
+
+The system supports multiple authentication flows to accommodate different user preferences and security needs:
+
+- **Email & Password**: Traditional username/password authentication
+- **Email OTP**: One-time passwords sent via email for passwordless login
+- **Social Providers**: OAuth integration with GitHub and Google
+- **Two-Factor Authentication**: TOTP-based 2FA for enhanced security
+- **API Keys**: Programmatic access for integrations and automation
+
+### Session Management
+
+Sessions are the cornerstone of user state management. Each session contains:
+
+- **User Identity**: Basic user information and metadata
+- **Organization Context**: The currently active organization and user's role within it
+- **Billing Information**: Current subscription status and payment details
+- **Security Tokens**: Encrypted session data stored in HTTP-only cookies
+
+Sessions automatically handle organization switching, ensuring all subsequent requests respect the active organization's boundaries.
+
+### Organization-Based Access Control
+
+Unlike simple user-based permissions, the SaaS Boilerplate implements organization-scoped access:
+
+- **Multi-Tenancy**: Each organization operates as an isolated tenant
+- **Role-Based Permissions**: Users have different roles (owner, admin, member) within organizations
+- **Data Isolation**: All business data is automatically scoped by organization ID
+- **Membership Management**: Users can belong to multiple organizations with different roles
+
+### API Key Authentication
+
+For programmatic access, the system supports API keys that bypass traditional user sessions:
+
+- **Organization-Scoped**: API keys belong to organizations, not individual users
+- **Role Requirements**: Keys can only access endpoints requiring specific organization roles
+- **Expiration Control**: Keys can be set to never expire or have custom expiration dates
+- **Audit Trail**: All API key usage is logged for security monitoring
+
+## Data Models
+
+The authentication system defines several TypeScript interfaces that govern how sessions and permissions work throughout the application.
+
+<TypeTable
+  type={{
+    OrganizationMembershipRole: {
+      description: 'Defines the available roles for organization membership, determining access levels within an organization.',
+      type: "'owner' | 'admin' | 'member'",
+    },
+    AuthRequirements: {
+      description: 'Controls authentication requirements for API endpoints - authenticated, unauthenticated, or super-admin access.',
+      type: "'authenticated' | 'unauthenticated' | 'super-authenticated'",
+    },
+    Session: {
+      description: 'Complete authentication session with user information and optional organization context based on role requirements.',
+      type: 'Session<TRoles>',
+    },
+    AppSession: {
+      description: 'Application session that conditionally includes authentication based on endpoint requirements.',
+      type: 'AppSession<TRequirements, TRoles>',
+    },
+  }}
+/>
+
+## Implementation Details
+
+The authentication system is implemented through a layered architecture that provides both low-level auth services and high-level procedures for business logic.
+
+<Steps>
+<Step>
+
+### Configure Better Auth Service
+
+The foundation is set up in `src/services/auth.ts`, which initializes Better Auth with all necessary plugins and configurations.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/services/auth.ts#L10-50
+export const auth = betterAuth({
+  baseURL: Url.get(),
+  secret: AppConfig.providers.auth.secret,
+  database: prismaAdapter(prisma, { provider: 'postgresql' }),
+  socialProviders: {
+    github: {
+      clientId: AppConfig.providers.auth.providers.github.clientId,
+      clientSecret: AppConfig.providers.auth.providers.github.clientSecret,
+    },
+    google: {
+      clientId: AppConfig.providers.auth.providers.google.clientId,
+      clientSecret: AppConfig.providers.auth.providers.google.clientSecret,
+    },
+  },
+  account: {
+    accountLinking: {
+      enabled: true,
+    },
+  },
+  plugins: [
+    twoFactor(),
+    organization({
+      sendInvitationEmail: async ({ email, organization, id }) => {
+        await mail.send({
+          to: email,
+          template: 'organization-invite',
+          data: {
+            email,
+            organization: organization.name,
+            url: Url.get(`/auth?invitation=${id}`),
+          },
+        })
+      },
+    }),
+    emailOTP({
+      async sendVerificationOTP({ email, otp, type }) {
+        const subjectMap = {
+          'sign-in': 'Your Access Code',
+          'email-verification': 'Verify Your Email',
+          'forget-password': 'Password Recovery',
+          default: 'Verification Code',
+        }
+
+        const subject = subjectMap[type] || subjectMap.default
+
+        await mail.send({
+          to: email,
+          subject,
+          template: 'otp-code',
+          data: {
+            email,
+            otpCode: otp,
+            expiresInMinutes: 10,
+          },
+        })
+      },
+    }),
+    nextCookies(),
+  ],
+})
+```
+
+This configuration enables social login, email OTP, two-factor authentication, and organization management with invitation emails.
+
+</Step>
+
+<Step>
+
+### Inject Authentication Context
+
+The `AuthFeatureProcedure` wraps all authenticated endpoints, providing a unified authentication context that includes session management, organization switching, and role validation.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/auth/procedures/auth.procedure.ts#L44-60
+export const AuthFeatureProcedure = igniter.procedure({
+  name: 'AuthFeatureProcedure',
+  handler: async (options, { request, response, context }) => {
+    return {
+      auth: {
+        setActiveOrganization: async (input: { organizationId: string }) => {
+          // Business Logic: Switch the user's active organization using the auth service
+          await tryCatch(
+            context.services.auth.api.setActiveOrganization({
+              body: input,
+              headers: request.headers,
+            }),
+          )
+        },
+        // ... other auth methods
+        getSession: async (options?: GetSessionInput<TRequirements, TRoles>) => {
+          // Complex session retrieval logic with role validation
+        },
+      },
+    }
+  },
+})
+```
+
+</Step>
+
+<Step>
+
+### Create Authentication Controllers
+
+Controllers expose authentication endpoints that handle sign-in flows, session management, and organization switching.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/auth/controllers/auth.controller.ts#L60-85
+signInWithProvider: igniter.mutation({
+  name: 'signInWithProvider',
+  description: 'Sign in with OAuth provider',
+  method: 'POST',
+  path: '/sign-in',
+  use: [AuthFeatureProcedure()],
+  body: z.object({
+    provider: z.string(),
+    callbackURL: z.string().optional(),
+  }),
+  handler: async ({ request, response, context }) => {
+    const { provider, callbackURL } = request.body
+
+    const result = await context.auth.signInWithProvider({
+      provider: provider as AccountProvider,
+      callbackURL,
+    })
+
+    if (result.error) {
+      throw new Error(result.error.code)
+    }
+
+    return response.success(result.data)
+  },
+}),
+```
+
+</Step>
+
+<Step>
+
+### Implement Role-Based Access Control
+
+In your business logic controllers, use the authentication context to enforce permissions and data isolation.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/features/lead/controllers/lead.controller.ts#L40-50
+list: igniter.query({
+  name: 'List',
+  description: 'List all leads for an organization.',
+  path: '/',
+  use: [AuthFeatureProcedure(), LeadProcedure()],
+  handler: async ({ context, response }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated',
+      roles: ['admin', 'owner', 'member'],
+    })
+
+    if (!session || !session.organization) {
+      return response.unauthorized(
+        'Authentication required and active organization needed.',
+      )
+    }
+
+    const organizationId = session.organization.id
+    const leads = await context.lead.findMany(organizationId)
+
+    return response.success(leads)
+  },
+}),
+```
+
+</Step>
+</Steps>
+
+## Practical Examples
+
+Let's see how authentication integrates with real business features in the SaaS Boilerplate.
+
+### Lead Management with Organization Scoping
+
+The lead feature demonstrates how authentication ensures data isolation between organizations. Each lead operation automatically scopes to the user's active organization.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/features/lead/controllers/lead.controller.ts#L60-85
+create: igniter.mutation({
+  name: 'Create',
+  description: 'Create a new lead.',
+  path: '/',
+  method: 'POST',
+  use: [
+    AuthFeatureProcedure(),
+    LeadProcedure(),
+    IntegrationFeatureProcedure(),
+  ],
+  body: LeadCreationSchema,
+  handler: async ({ context, request, response }) => {
+    const session = await context.auth.getSession({
+      requirements: 'authenticated',
+      roles: ['admin', 'owner', 'member'],
+    })
+
+    if (!session || !session.organization) {
+      return response.unauthorized(
+        'Authentication required and active organization needed.',
+      )
+    }
+
+    const organizationId = session.organization.id
+    const { email, name, phone, metadata } = request.body
+
+    const lead = await context.lead.create(organizationId, {
+      email,
+      name,
+      phone,
+      metadata,
+    })
+
+    return response.success(lead)
+  },
+}),
+```
+
+### API Key Authentication for Integrations
+
+For programmatic access, API keys provide organization-scoped authentication without user sessions.
+
+```ts /Users/felipebarcelospro/Sandbox/vibe-dev/saas-boilerplate/src/@saas-boilerplate/features/auth/procedures/auth.procedure.ts#L200-230
+getSession: async (options?: GetSessionInput<TRequirements, TRoles>) => {
+  const session = await context.services.auth.api.getSession({
+    headers: request.headers,
+  })
+
+  // Security Rule: Check for API Key authentication if no regular session exists
+  let apiKeyOrganization = null
+  if (!session) {
+    const authHeader = request.headers.get('Authorization')
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+
+      const apiKey = await context.services.database.apiKey.findUnique({
+        where: {
+          key: token,
+          enabled: true,
+        },
+        include: {
+          organization: true,
+        },
+      })
+
+      if (apiKey) {
+        if (
+          !apiKey.neverExpires &&
+          apiKey.expiresAt &&
+          new Date() > apiKey.expiresAt
+        ) {
+          throw new Error('API_KEY_EXPIRED')
+        }
+
+        if (!options?.roles || options.roles.length === 0) {
+          throw new Error('API_KEY_REQUIRES_ORGANIZATION_ENDPOINT')
+        }
+
+        apiKeyOrganization = apiKey.organization
+      }
+    }
+  }
+  // ... rest of session logic
+}
+```
+
+## Error Codes
+
+The authentication system provides specific error codes to help developers understand and handle different authentication scenarios. These errors are thrown during session validation and can be caught and handled appropriately in your application.
+
+<TypeTable
+  type={{
+    UNAUTHORIZED: {
+      description: 'User is not authenticated when authentication is required. No valid session or API key found.',
+      type: 'Error',
+    },
+    USER_NOT_FOUND: {
+      description: 'The authenticated user no longer exists in the database. May indicate account deletion or data corruption.',
+      type: 'Error',
+    },
+    NO_ORGANIZATION_ACCESS: {
+      description: 'User is authenticated but has no active organization or membership when organization access is required.',
+      type: 'Error',
+    },
+    INSUFFICIENT_PERMISSIONS: {
+      description: 'User lacks the required role(s) within their organization to perform the requested action.',
+      type: 'Error',
+    },
+    INSUFFICIENT_PERMISSIONS_SUPER_ADMIN: {
+      description: 'User does not have super-admin privileges when super-authenticated requirement is specified.',
+      type: 'Error',
+    },
+    ALREADY_AUTHENTICATED: {
+      description: 'User is already authenticated when unauthenticated access is required (e.g., login/signup pages).',
+      type: 'Error',
+    },
+    API_KEY_EXPIRED: {
+      description: 'The provided API key has expired and is no longer valid for authentication.',
+      type: 'Error',
+    },
+    API_KEY_REQUIRES_ORGANIZATION_ENDPOINT: {
+      description: 'API key authentication was attempted on an endpoint that requires organization role validation.',
+      type: 'Error',
+    },
+  }}
+/>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Session returns null unexpectedly">
+Check that `BETTER_AUTH_SECRET` is set and unique. Verify the session cookie isn't being blocked by browser security settings or CORS policies. For API endpoints, ensure the request includes proper cookie headers.
+</Accordion>
+<Accordion title="Social login redirects fail">
+Verify OAuth provider callback URLs match your `baseURL` configuration. Check that client IDs and secrets are correctly set in environment variables. Ensure the provider app is configured with the right redirect URIs.
+</Accordion>
+<Accordion title="OTP emails not being sent">
+Confirm your mail service is properly configured. Check that the `emailOTP` plugin's `sendVerificationOTP` function is being called. Verify email templates exist and the mail service can connect to your SMTP provider.
+</Accordion>
+<Accordion title="Organization switching doesn't work">
+Ensure the user is actually a member of the target organization. Check that the `organizationId` is valid and the user has appropriate permissions. Verify the session is being updated correctly after switching.
+</Accordion>
+<Accordion title="API key authentication fails">
+Confirm the API key exists and is enabled. Check expiration dates and ensure the key is being sent in the `Authorization: Bearer <key>` header. Verify the endpoint requires organization roles when using API keys.
+</Accordion>
+<Accordion title="Role-based access denied">
+Check the user's membership role in the organization. Ensure the session includes the correct organization context. Verify that role requirements in `getSession()` match the user's actual permissions.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Session Security">
+Always validate sessions on sensitive operations. Use short session lifetimes for high-security applications. Implement proper logout to clear session data and cookies.
+</Accordion>
+<Accordion title="Organization Context">
+Always check for active organization context in multi-tenant operations. Provide clear UI feedback when users need to select or switch organizations. Handle cases where users belong to multiple organizations gracefully.
+</Accordion>
+<Accordion title="API Key Management">
+Rotate API keys regularly for security. Use descriptive names and proper scoping. Implement rate limiting and monitoring for API key usage. Never expose API keys in client-side code or logs.
+</Accordion>
+<Accordion title="Error Handling">
+Provide clear, actionable error messages for authentication failures. Distinguish between different failure types (invalid credentials, insufficient permissions, expired sessions). Log security events for monitoring without exposing sensitive information.
+</Accordion>
+<Accordion title="User Experience">
+Implement smooth authentication flows with proper loading states. Provide clear feedback during sign-in processes. Support password recovery and account verification flows. Make organization switching intuitive and fast.
+</Accordion>
+</Accordions>

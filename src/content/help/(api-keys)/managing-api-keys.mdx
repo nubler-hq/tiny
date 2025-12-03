@@ -1,0 +1,110 @@
+---
+title: "Managing API Keys"
+description: "Create, manage, and secure API keys for integrating SaaS Boilerplate with external services and applications."
+---
+
+![API Keys page showing API key management tools and existing keys.](/images/help-center/api-keys/01-api-keys-page.jpeg)
+
+## Introduction
+
+API keys allow secure integration between SaaS Boilerplate and external services. This guide covers creating, managing, and securing your API keys. By the end, you'll have the keys needed for your integrations and understand best practices for security.
+
+<Callout title="Tip">API keys enable powerful automations but require careful management for security.</Callout>
+
+## Prerequisites
+
+- Organization admin or owner access
+- Understanding of the external service you'll integrate with
+- Knowledge of API security best practices
+
+## Core Concepts
+
+### API Keys
+Unique identifiers that authenticate API requests to your SaaS Boilerplate account.
+
+### Permissions and Scopes
+Control what actions an API key can perform, following the principle of least privilege.
+
+### Key Lifecycle
+Keys can be created, rotated, and deleted as needed for security.
+
+## Step-by-Step Guide
+
+<Steps>
+<Step>
+### Access API Keys Page
+Navigate to Settings > Organization > API Keys in the dashboard.
+</Step>
+
+<Step>
+### Create a New Key
+Click "Create API Key" and configure:
+
+<TypeTable
+  type={{
+    name: {
+      description: 'Descriptive name for the key',
+      type: 'string',
+      default: 'Required',
+    },
+    description: {
+      description: 'Optional details about usage',
+      type: 'string',
+      default: 'Optional',
+    },
+    permissions: {
+      description: 'Access scopes for the key',
+      type: 'array',
+      default: 'Read-only',
+    },
+    expiration: {
+      description: 'Optional expiry date',
+      type: 'date',
+      default: 'Never',
+    },
+  }}
+/>
+</Step>
+
+<Step>
+### Secure the Key
+Copy the generated key immediately and store it securely. Keys are only shown once.
+</Step>
+
+<Step>
+### Test the Integration
+Use the key in your external service and verify it works as expected.
+</Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Key not working">
+Verify the key is correct, active, and has proper permissions. Check for typos.
+</Accordion>
+<Accordion title="Permission denied">
+Ensure the key has the required scopes for your intended operations.
+</Accordion>
+<Accordion title="Key expired">
+Create a new key or update the expiration date if possible.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Use unique keys per service">
+Create separate keys for different integrations to limit impact if compromised.
+</Accordion>
+<Accordion title="Rotate keys regularly">
+Change keys periodically and update integrations to maintain security.
+</Accordion>
+<Accordion title="Monitor usage">
+Check API usage logs to detect unusual activity.
+</Accordion>
+<Accordion title="Store securely">
+Never commit keys to code repositories; use environment variables or secure vaults.
+</Accordion>
+</Accordions>
+```

@@ -1,0 +1,9 @@
+{
+  "title": "Leads",
+  "description": "Guide for managing leads, opportunities, and contacts.",
+  "icon": "UserGroupIcon",
+  "pages": [
+    "managing-leads"
+  ],
+  "defaultOpen": true
+}

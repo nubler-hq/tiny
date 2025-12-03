@@ -1,0 +1,117 @@
+---
+title: "Managing Billing"
+description: "Learn how to monitor your subscription, manage billing details, upgrade plans, and optimize costs in SaaS Boilerplate."
+---
+
+![Billing page showing subscription details, usage monitoring, and plan management options.](/images/help-center/billing/01-billing-page.jpeg)
+
+## Introduction
+
+Your billing dashboard is the central place to manage your SaaS Boilerplate subscription. Here, you can monitor usage, update payment information, upgrade plans, and ensure your account stays active. By the end of this guide, you'll know how to handle all aspects of your billing effectively.
+
+<Callout title="Tip">Regular billing checks help you optimize costs and avoid service interruptions.</Callout>
+
+## Prerequisites
+
+- Active SaaS Boilerplate account
+- Access to organization settings (Owner or Admin role)
+- Understanding of your current plan and usage needs
+
+## Core Concepts
+
+### Subscription Plans
+SaaS Boilerplate offers tiered plans with different limits on team members (seats), leads, submissions, and features. Plans scale with your business needs.
+
+### Usage Limits
+Each plan has limits on resources like team members and data entries. Monitoring usage prevents unexpected restrictions.
+
+### Billing Cycle
+Subscriptions renew monthly or annually. You can change plans or cancel anytime.
+
+## Step-by-Step Guide
+
+<Steps>
+<Step>
+### Access Billing Settings
+Navigate to Settings > Organization > Billing in the dashboard sidebar.
+</Step>
+
+<Step>
+### Review Current Subscription
+Check your current plan, billing cycle, and usage statistics. The dashboard shows:
+- Plan details and status
+- Next billing date
+- Resource usage (seats, leads, submissions)
+</Step>
+
+<Step>
+### Monitor Usage
+Review the usage section for each resource:
+
+<TypeTable
+  type={{
+    seats: {
+      description: 'Number of team members allowed',
+      type: 'integer',
+      default: 'Varies by plan',
+    },
+    leads: {
+      description: 'Contact records you can store',
+      type: 'integer',
+      default: 'Varies by plan',
+    },
+    submissions: {
+      description: 'Form responses you can collect',
+      type: 'integer',
+      default: 'Varies by plan',
+    },
+  }}
+/>
+
+Look for alerts when approaching limits.
+</Step>
+
+<Step>
+### Update Billing Information
+Manage your billing email and payment methods. Ensure contact information is current for invoice delivery.
+</Step>
+
+<Step>
+### Upgrade or Change Plans
+If needed, select a new plan that fits your usage. Follow the prompts to complete the change and payment.
+</Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Usage not updating">
+Refresh the page or wait a few minutes for sync. Contact support if issues persist.
+</Accordion>
+<Accordion title="Payment failed">
+Check payment method details and try again. Update card information if expired.
+</Accordion>
+<Accordion title="Plan change not applied">
+Wait for the billing cycle to process. Check email for confirmation.
+</Accordion>
+<Accordion title="Billing email incorrect">
+Update the billing email in settings to ensure you receive invoices.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Monitor usage weekly">
+Regular checks help you plan upgrades before hitting limits.
+</Accordion>
+<Accordion title="Plan for growth">
+Choose plans that accommodate expected team and data growth.
+</Accordion>
+<Accordion title="Keep payment info current">
+Update cards before expiration to avoid service interruptions.
+</Accordion>
+<Accordion title="Review invoices">
+Check statements for accuracy and track spending over time.
+</Accordion>
+</Accordions>

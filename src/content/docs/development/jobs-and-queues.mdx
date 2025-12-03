@@ -1,0 +1,285 @@
+---
+title: Jobs & Queues
+description: Background work with BullMQ adapters and patterns.
+---
+
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Accordions, Accordion } from 'fumadocs-ui/components/accordion';
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+By the end of this guide, you'll understand how to offload long-running tasks to background queues using BullMQ, ensuring your API responses remain fast and reliable. We'll cover setting up job adapters, defining jobs with type-safe inputs, scheduling tasks, and monitoring their execution.
+
+## Overview
+
+Jobs and queues let you run time-consuming operations asynchronously, preventing API timeouts and improving user experience. The SaaS Boilerplate uses BullMQ via Igniter's adapter system, backed by Redis for persistence and scalability.
+
+Key benefits include:
+- **Non-blocking APIs**: Schedule heavy work and respond immediately to users.
+- **Reliability**: Automatic retries, dead letter queues, and job persistence.
+- **Observability**: Built-in logging and monitoring for job states.
+- **Type Safety**: Zod schemas ensure input validation and TypeScript support.
+
+## Core Concepts
+
+### Job Adapters
+The system uses `createBullMQAdapter` to create a job queue instance. It connects to Redis for storage and supports worker configuration like concurrency and debugging.
+
+### Job Definitions
+Jobs are defined with:
+- A unique name
+- A Zod input schema for validation
+- An async handler function that receives input and context
+
+### Job Scheduling
+Jobs are scheduled from within procedures using the `schedule` method. This adds the job to the queue for background processing.
+
+### Job Routers
+Multiple jobs can be grouped under namespaces using routers, keeping related tasks organized.
+
+## Setting Up Jobs
+
+<Steps>
+<Step>
+### Initialize the Job Adapter
+Create a BullMQ adapter instance with your Redis store and worker settings.
+```typescript
+// src/services/jobs.ts
+import { createBullMQAdapter } from '@igniter-js/adapter-bullmq'
+import { store } from './store'
+import { z } from 'zod'
+import { igniter } from '@/igniter'
+
+export const jobs = createBullMQAdapter({
+  store,
+  autoStartWorker: {
+    concurrency: 1,
+    debug: true,
+  },
+})
+```
+</Step>
+
+<Step>
+### Define Job Schemas
+Use Zod to define type-safe input schemas for your jobs.
+```typescript
+// Example webhook dispatch job input
+const webhookDispatchInput = z.object({
+  webhook: z.object({
+    id: z.string(),
+    url: z.string().url(),
+    secret: z.string(),
+    events: z.array(z.string()),
+  }),
+  payload: z.record(z.any()),
+  eventName: z.string(),
+  retries: z.number().default(0),
+})
+```
+</Step>
+
+<Step>
+### Register Jobs
+Register jobs with names, inputs, and handlers.
+```typescript
+// src/services/jobs.ts
+export const registeredJobs = jobs.merge({
+  webhook: jobs.router({
+    namespace: 'webhook',
+    jobs: {
+      dispatch: jobs.register({
+        name: 'dispatch',
+        input: webhookDispatchInput,
+        handler: async ({ input, context }) => {
+          // Job logic here
+          try {
+            const response = await fetch(input.webhook.url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Webhook-Secret': input.webhook.secret,
+              },
+              body: JSON.stringify(input.payload),
+            })
+            
+            if (!response.ok) {
+              throw new Error(`Dispatch failed: ${response.status}`)
+            }
+            
+            igniter.logger.info(`Webhook dispatched successfully`)
+          } catch (error) {
+            igniter.logger.error(`Webhook dispatch failed: ${error.message}`)
+            throw error
+          }
+        },
+      }),
+    },
+  }),
+})
+```
+</Step>
+
+<Step>
+### Integrate with Igniter
+Add the jobs to your Igniter instance.
+```typescript
+// src/igniter.ts
+export const igniter = Igniter.context(createIgniterAppContext)
+  .store(store)
+  .jobs(registeredJobs)
+  // ... other config
+  .create()
+```
+</Step>
+</Steps>
+
+## Job Input Schemas
+
+<TypeTable
+  type={{
+    webhook: {
+      description: 'Webhook configuration object',
+      type: 'object',
+      default: 'Required',
+    },
+    'webhook.id': {
+      description: 'Unique webhook identifier',
+      type: 'string',
+      default: 'Required',
+    },
+    'webhook.url': {
+      description: 'Webhook endpoint URL',
+      type: 'string (URL)',
+      default: 'Required',
+    },
+    'webhook.secret': {
+      description: 'Secret for webhook authentication',
+      type: 'string',
+      default: 'Required',
+    },
+    'webhook.events': {
+      description: 'Array of events this webhook listens to',
+      type: 'string[]',
+      default: 'Required',
+    },
+    payload: {
+      description: 'Dynamic payload data to send',
+      type: 'Record<string, any>',
+      default: 'Required',
+    },
+    eventName: {
+      description: 'Name of the triggering event',
+      type: 'string',
+      default: 'Required',
+    },
+    retries: {
+      description: 'Number of retry attempts',
+      type: 'number',
+      default: '0',
+    },
+  }}
+/>
+
+## Scheduling Jobs
+
+Schedule jobs from your procedures when you need background processing.
+
+```typescript
+// src/@saas-boilerplate/features/webhook/procedures/webhook.procedure.ts
+// Inside a procedure handler
+for (const webhook of webhooks) {
+  if (webhook.events.includes(params.event)) {
+    await igniter.jobs.webhook.schedule({
+      task: 'dispatch',
+      input: {
+        webhook: {
+          id: webhook.id,
+          url: webhook.url,
+          secret: webhook.secret,
+          events: webhook.events,
+        },
+        payload: params.payload,
+        eventName: params.event,
+      },
+    })
+  }
+}
+```
+
+## Practical Example: Email Notifications
+
+Here's how you might implement email sending as a background job:
+
+```typescript
+// src/services/jobs.ts
+export const emailJobs = jobs.router({
+  namespace: 'email',
+  jobs: {
+    sendWelcome: jobs.register({
+      name: 'sendWelcome',
+      input: z.object({
+        userId: z.string(),
+        userEmail: z.string().email(),
+      }),
+      handler: async ({ input, context }) => {
+        // Send welcome email logic
+        await context.mail.send({
+          to: input.userEmail,
+          subject: 'Welcome!',
+          template: 'welcome',
+        })
+      },
+    }),
+  },
+})
+
+// In a user creation procedure
+await igniter.jobs.email.schedule({
+  task: 'sendWelcome',
+  input: { userId: user.id, userEmail: user.email },
+})
+```
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Jobs aren't processing">
+Check your Redis connection and worker configuration. Ensure `autoStartWorker` is enabled and concurrency is set appropriately for your workload.
+</Accordion>
+
+<Accordion title="Job input validation errors">
+Verify your Zod schemas match the data you're passing. Use TypeScript to catch type mismatches at compile time.
+</Accordion>
+
+<Accordion title="Jobs failing with retries">
+Implement proper error handling in job handlers. BullMQ will automatically retry failed jobs based on your configuration.
+</Accordion>
+
+<Accordion title="High memory usage">
+Monitor job queue length and adjust concurrency. Consider using job priorities or rate limiting for resource-intensive tasks.
+</Accordion>
+</Accordions>
+
+## Best Practices
+
+<Accordions type="multiple">
+<Accordion title="Keep jobs idempotent">
+Design jobs to be safe to run multiple times. Use unique identifiers to prevent duplicate processing.
+</Accordion>
+
+<Accordion title="Use appropriate concurrency">
+Set worker concurrency based on your job types. CPU-bound jobs benefit from lower concurrency, I/O-bound from higher.
+</Accordion>
+
+<Accordion title="Monitor job performance">
+Log job start/end times and failures. Use BullMQ's built-in monitoring or integrate with your observability stack.
+</Accordion>
+
+<Accordion title="Handle failures gracefully">
+Implement retry logic and dead letter queues. Notify administrators of persistent failures.
+</Accordion>
+
+<Accordion title="Test job handlers">
+Write unit tests for job logic. Use test doubles for external dependencies like email services.
+</Accordion>
+</Accordions>

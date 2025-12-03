@@ -1,0 +1,93 @@
+---
+title: "Connect AI Assistants with Model Context Protocol (MCP)"
+description: "Connect ChatGPT, Claude, and developer tools to your organization using a secure MCP endpoint."
+---
+
+![Integrations page showing available integrations organized by category with installation options.](/images/help-center/mcp-server/01-mcp-settings.jpeg)
+
+## Introduction
+
+Model Context Protocol (MCP) lets you connect AI assistants to your organization so they can securely perform actions and fetch data on your behalf. With SaaS Boilerplate, each organization has its own MCP Server URL, ready to use with ChatGPT, Claude, and popular developer tools.
+
+<Callout title="Good to know">You can regenerate your MCP key anytime from the settings page to revoke old access.</Callout>
+
+## Prerequisites
+
+- Organization role: Owner or Admin
+- An active organization in your SaaS workspace
+- An AI assistant that supports MCP (e.g., ChatGPT Connectors, Claude)
+
+## Where to Find Your MCP URL
+
+<Steps>
+<Step>
+### Open the MCP settings
+Go to Dashboard → Settings → Organization → Model Context Protocol.
+</Step>
+
+<Step>
+### Copy your organization URL
+Use the copy button to copy the MCP Server URL. This URL looks like: `https://yourapp.com/mcp/sk_xxx.../sse`.
+</Step>
+
+<Step>
+### (Optional) Regenerate the key
+You can rotate the MCP key at any time. This will immediately invalidate the previous URL.
+</Step>
+</Steps>
+
+## Quick Setup Guides
+
+<Steps>
+<Step>
+### ChatGPT (Connectors)
+- Open ChatGPT settings → Connectors
+- Enable Developer Mode (if required)
+- Click “Add Connector”
+- Paste your organization’s MCP URL and save
+</Step>
+
+<Step>
+### Claude (Remote Servers)
+- Open Claude settings → Developer → Edit Config
+- Paste the provided JSON configuration with your organization’s MCP URL
+- Save and restart Claude
+</Step>
+
+<Step>
+### Developer Tools (Cursor, Cline, Windsurf, Roo Code, VS Code Copilot)
+Create or edit the tool-specific MCP configuration file (e.g., `.cursor/mcp.json`, `.vscode/mcp.json`) and paste the URL. Restart the tool if needed.
+</Step>
+</Steps>
+
+## What You Can Do
+
+- Ask the assistant to list or create items (like leads or submissions) within your organization.
+- Automate common tasks (e.g., “Create a new lead named Jane Doe with email jane@acme.com”).
+- Explore data quickly without leaving your assistant.
+
+## Security & Privacy
+
+- Your MCP URL is unique to your organization and tied to a secure API key.
+- Regenerating the key will immediately block old connections.
+- Access is always scoped to your organization; assistants can’t see other organizations.
+
+## Troubleshooting
+
+<Accordions type="multiple">
+<Accordion title="Connection failed in ChatGPT">
+Check that the MCP URL is correct and the key wasn’t regenerated. Try re-adding the connector.
+</Accordion>
+<Accordion title="Permission denied">
+Ask an Organization Admin/Owner to verify your role and that MCP access is enabled for your org.
+</Accordion>
+<Accordion title="URL works sometimes but fails later">
+The key may have been rotated. Copy the latest URL from the settings page.
+</Accordion>
+</Accordions>
+
+## Need Help?
+
+- Contact your Organization Admin to verify roles and access.
+- If the issue persists, reach out to support with a screenshot of the settings page.
+
